@@ -16,10 +16,10 @@ Analysis of Guillaume Thekkadath's TES dataset using principal component analysi
 
 A qualitative exploration of dimensionality reduction techniques for single photon detection. The goal is to identify methods that can create easily distinguishable clusters. Clustering techniques can afterward be applied to label signals to photon numbers. 
 
-## Neural network (In progress)
+## Autoencoder
 `NeuralNetwork.ipynb`
 
-Neural network trained to reproduce the signal it receives as input. Half the network is then used to extract one value associated to a photon number.
+Neural network trained to reproduce the signal it receives as input. Half the network (encoder) can be used to asign an arbitrary number of parameters to an input signal. This way, the encoder acts as a dimensionality reduction process.
 
 <p align="center">
     <img src="Assets/BowTie to HalfTie.png"/>
