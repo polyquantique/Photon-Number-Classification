@@ -3,7 +3,7 @@
 ## Table of Contents  
 * [Principal component analysis](#principal-component-analysis)
 * [Dimensionality reduction](#dimensionality-reduction)  
-* [Neural network](#neural-network-in-progress)
+* [Neural network](#autoencoder)
 * [Futur tasks](#todo)  
 
 ## Principal component analysis 
@@ -29,4 +29,3 @@ Neural network trained to reproduce the signal it receives as input. Half the ne
 
 - Dimensionality reduction metric.
     - Parameter optimization for dimensionality reduction techniques.
-- Neural network 
