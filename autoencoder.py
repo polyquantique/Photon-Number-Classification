@@ -78,8 +78,10 @@ class build_autoencoder(nn.Module):
         # Number of layer
         #encoder_layers = np.linspace(config["input_dimension"], config["output_dimension"], int(config['layer_number'] / 2 + 1), dtype=int)
         #layer_list = np.concatenate((encoder_layers, np.flip(encoder_layers)[1:]))
+        skip = config['network']["skip_elements"]
+        size = config['files']['input_dimension']
         layer_list = config['run']['layer_list']
-        layer_list[0] = layer_list[-1] = config['internal']['input_dimension']
+        layer_list[0] = layer_list[-1] = int(size / skip)
         activation_list = config['run']['activation_list']
         
         # Build network
@@ -232,13 +234,8 @@ class autoencoder:
             - Updated dictionary. Define `input_dimension` of the autoencoder
         """
         folder = f"Datasets/{config['files']['dataset']}"
-        skip = config['network']["skip_elements"]
         files = listdir(folder)
-        input_dimension = np.shape(np.load(f"{folder}/{files[0]}", allow_pickle=True))[1]
-        config['internal']['input_dimension'] = int(input_dimension / skip)
 
-
-        # 
         fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42)
         train_validation_files, test_files = train_test_split(files,train_size=config['train']['train_size'],shuffle=True)
         splits = fold.split(train_validation_files)
@@ -293,13 +290,13 @@ class autoencoder:
         """
         skip = config['network']["skip_elements"]
         folder = f"Datasets/{config['files']['dataset']}"
-        size = config['internal']['input_dimension']
+        size = config['files']['input_dimension']
 
-        TES = np.concatenate([np.load(f"{folder}/{file_name}", allow_pickle=True) for file_name in files])
+        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}",dtype=np.uint16).reshape((-1,size)) for file_name in listdir(folder)])
         
         if skip > 1: TES = [i[1::skip] for i in TES]
 
-        return torch.tensor(np.array(TES, dtype="float32")).view(-1,1,size)
+        return torch.tensor(np.array(TES, dtype="float32")).view(-1,1,int(size / skip))
         
     
     def build_optimizer(self, network, config):
