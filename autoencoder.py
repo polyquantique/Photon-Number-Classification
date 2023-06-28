@@ -292,9 +292,9 @@ class autoencoder:
         folder = f"Datasets/{config['files']['dataset']}"
         size = config['files']['input_dimension']
 
-        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}",dtype=np.uint16).reshape((-1,size)) for file_name in listdir(folder)])
+        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,8192)) for file_name in files])
         
-        if skip > 1: TES = [i[1::skip] for i in TES]
+        if skip > 1: TES = [i[:800][1::skip] for i in TES]
 
         return torch.tensor(np.array(TES, dtype="float32")).view(-1,1,int(size / skip))
         
