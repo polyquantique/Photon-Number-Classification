@@ -88,8 +88,8 @@ class build_autoencoder(nn.Module):
         self.encoder = nn.Sequential()
         self.decoder = nn.Sequential()
 
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
         
         for index, activation_type in enumerate(activation_list):
             if index < len(activation_list) // 2 + 1:
@@ -101,8 +101,8 @@ class build_autoencoder(nn.Module):
             
         self.decoder.append(layer(layer_list[-2], layer_list[-1]))
 
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
 
     def forward(self, X, encoding=False, decoding=False) -> any:
         """
