@@ -88,8 +88,8 @@ class build_autoencoder(nn.Module):
         self.encoder = nn.Sequential()
         self.decoder = nn.Sequential()
 
-        self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
         
         for index, activation_type in enumerate(activation_list):
             if index < len(activation_list) // 2 + 1:
@@ -101,8 +101,8 @@ class build_autoencoder(nn.Module):
             
         self.decoder.append(layer(layer_list[-2], layer_list[-1]))
 
-        self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
 
     def forward(self, X, encoding=False, decoding=False) -> any:
         """
@@ -292,9 +292,9 @@ class autoencoder:
         folder = f"Datasets/{config['files']['dataset']}"
         size = config['files']['input_dimension']
 
-        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,8192)) for file_name in files])
+        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
         
-        if skip > 1: TES = [i[:800][1::skip] for i in TES]
+        if skip > 1: TES = [i[1::skip] for i in TES]
 
         return torch.tensor(np.array(TES, dtype="float32")).view(-1,1,int(size / skip))
         
