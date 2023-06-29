@@ -695,7 +695,7 @@ class autoencoder:
 
             results = self.open_object(f"{path}/{fold}/results.bin")
             
-            axs[0,0].scatter(results['encode1'], results['encode2'],label=f"fold {index}",s=5,alpha=0.01)
+            axs[0,0].scatter(results['encode1'], results['encode2'],label=f"fold {index}",s=5,alpha=0.001)
             axs[0,0].set_xlabel("feature 1")
             axs[0,0].set_ylabel("feature 2")
             leg = axs[0,0].legend()
