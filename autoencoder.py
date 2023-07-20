@@ -1,6 +1,7 @@
 import numpy as np
 from os import listdir, makedirs
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from datetime import datetime
 from  random import choices, choice
 
@@ -8,9 +9,8 @@ import torch
 import torch.onnx
 from torch import nn
 import torch.optim as optim
-from torch.utils.data import Dataset, SubsetRandomSampler, DataLoader, random_split
 
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import KFold, train_test_split, ParameterGrid
 
 from tqdm.notebook import tqdm
 import pickle
@@ -293,10 +293,10 @@ class autoencoder:
         size = config['files']['input_dimension']
 
         TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
-        
-        if skip > 1: TES = [i[1::skip] for i in TES]
 
-        return torch.tensor(np.array(TES, dtype="float32")).view(-1,1,int(size / skip))
+        if skip > 1: TES = TES[:, 1::skip]
+
+        return torch.from_numpy(TES).view(-1, 1, int(size / skip)).float()
         
     
     def build_optimizer(self, network, config):
@@ -321,7 +321,7 @@ class autoencoder:
 
         optimizer_dict = {
             "SGD"  : optim.SGD,
-            "adam" : optim.Adam
+            "Adam" : optim.Adam
         }
 
         try:
@@ -458,14 +458,13 @@ class autoencoder:
             - Average loss : float
                 - Average loss of the training process (loss of one epoch).
         """
-        lenght = len(X)
-        results = {'encode1'     : [],
-                'encode2'     : [],
-                'decode'      : [],
-                'input'       : []
-                }
-
         cumu_loss = 0
+
+        if store:
+            results = {f'encode{i}': [] for i in range(config['network']['output_dimension'])}
+            results['input'] = []
+            results['decode'] = []
+
         network.eval()
         with torch.no_grad():
             for index, data in enumerate(X):
@@ -473,20 +472,17 @@ class autoencoder:
                 data = data.double().to(config['internal']['device'])
 
                 if store:
-                    
                     encode = network(data, encoding=True)
                     decode = network(encode, decoding =True)
 
                     save_encode = torch.clone(encode).numpy()
-                    results["encode1"].append(save_encode[0,0])
-                    results["encode2"].append(save_encode[0,1])
+                    for dimension in range(config['network']['output_dimension']):
+                        results[f'encode{dimension}'].append(save_encode[0,dimension])
 
-                    if index > 3:
-                        save_input = torch.clone(data).numpy()
-                        results["input"].append(save_input[0])
+                    if index < 2:
+                        results['input'].append(data.clone().numpy()[0])
+                        results['decode'].append(decode.clone().numpy()[0])
 
-                        save_encode = torch.clone(decode).numpy()
-                        results["decode"].append(save_encode[0])
                 else:
                     decode = network(data)
                     
@@ -494,9 +490,9 @@ class autoencoder:
                 cumu_loss += loss.item()
 
         if store:
-            return cumu_loss / lenght, results
+            return cumu_loss / len(X), results
         
-        return cumu_loss, lenght
+        return cumu_loss, len(X)
     
 
     def save_all(self, log_path, network, results, loss, config):
@@ -531,7 +527,7 @@ class autoencoder:
         """
         # log path and folder creation to store results
         if config['sweep']['sweep_name'] is not None:
-            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {config['internal']['sweep_index']}"
+            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
         else:
             config['internal'] = {}
             folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
@@ -587,7 +583,7 @@ class autoencoder:
 
 
 
-    def sweep(self, name, test_number, build_autoencoder, config):
+    def sweep(self, name, build_autoencoder, config, test_number=1):
         """
         # Sweep 
 
@@ -633,39 +629,50 @@ class autoencoder:
             pbar = tqdm(total=test_number)
             while config_run['internal']["sweep_index"] <= test_number:
 
-                if 'layer_possibility' in config['sweep']['search_param']:
-                        layer_number = choice(config['sweep']['layer_possibility']['number'])
-                        layer_list = choices(config['sweep']['layer_possibility']['size'], k = int(layer_number / 2))
+                if 'layer_size_possibility' in config['sweep']['search_param']:
+                        layer_number = choice(config['run']['layer_number'])
+                        layer_list = choices(config['sweep']['layer_size_possibility'], k = int(layer_number / 2))
                         layer_list.append(config['network']['output_dimension'])
                         
                         config_run['run']['layer_list'] = layer_list + list(reversed(layer_list))[1:]
-                        config_run['run']['layer_number'] = layer_number
 
                 for parameter in config['sweep']['search_param']:
 
                     if parameter == 'activation_possibilty':
                         activation_list = choices(config['sweep'][parameter], k = int(layer_number / 2))
                         config_run['run']['activation_list'] = activation_list + list(reversed(activation_list))[1:]
-                    elif parameter == 'layer_possibility':
+                    elif parameter == 'layer_size_possibility':
                         pass
                     else:
                         config_run['sweep'][parameter] = choice(config[parameter])
                     
                 # Train the newly created config
                 self.run(build_autoencoder, config_run)
-                # Only save the results if the results meet threshold criteria
                 config_run['internal']['sweep_index'] += 1
                 pbar.update(1)
             pbar.close()
-        """
+        
         elif config['sweep']['search_type'] == 'grid_search':
-            for parameter in tqdm(config['sweep']['search_param']):
-                for value in config[parameter]:
-                    config_run[parameter] = value
-                    # Train the newly created config
-                    threshold = train(config_run)
-                    config_run['sweep_index'] +=1
-        """
+            parameter_dict = {}
+            for parameter in config['sweep']['search_param']:
+                parameter_dict[parameter[1]] = config[parameter[0]][parameter[1]]
+
+            parameter_list = list(ParameterGrid(parameter_dict))
+            test_number = len(parameter_list)
+            config_run['internal']['number_size'] = len(str(test_number))
+
+            pbar = tqdm(total=test_number)
+            for parameters in parameter_list:
+                for value in parameters:
+                    print(f"{value} : " , parameters[value])
+                    config_run['train'][value] = parameters[value]
+                
+                # Train the newly created config
+                self.run(build_autoencoder, config_run)
+                config_run['internal']['sweep_index'] += 1
+                pbar.update(1)
+            pbar.close()
+        
 
     def load_results(self, file_name):
         """
@@ -695,12 +702,20 @@ class autoencoder:
 
             results = self.open_object(f"{path}/{fold}/results.bin")
             
-            axs[0,0].scatter(results['encode1'], results['encode2'],label=f"fold {index}",s=5,alpha=0.001)
-            axs[0,0].set_xlabel("feature 1")
-            axs[0,0].set_ylabel("feature 2")
-            leg = axs[0,0].legend()
-            for lh in leg.legendHandles: 
-                lh.set_alpha(1)
+            if "encode1" in results: 
+                axs[0,0].scatter(results['encode0'], results['encode1'],label=f"fold {index}",s=5,alpha=0.01)
+                axs[0,0].set_xlabel("feature 1")
+                axs[0,0].set_ylabel("feature 2")
+                #axs[0,0].set_yscale("log")
+                leg = axs[0,0].legend()
+                for lh in leg.legendHandles: 
+                    lh.set_alpha(1)
+            else:
+                axs[0,0].hist(results['encode0'],bins=4500)
+                axs[0,0].set_xlabel("feature 1")
+                axs[0,0].set_ylabel("counts")
+
+                
 
             axs[1,0].plot(results['decode'][0],label=f"Autoencoder output {index}")
             axs[1,0].plot(results['input'][0],label=f"Autoencoder input {index}")
@@ -728,3 +743,50 @@ class autoencoder:
         print("Layer list : ", config_file['run']['layer_list'])
 
 
+    def load_sweep_results(self, file_name, parameters):
+        warnings.filterwarnings("ignore")
+        path = f"Autoencoder Log/{file_name}"
+
+        parameter1 = []
+        parameter2 = []
+        loss_sweep = []
+        min_loss = 1
+        
+        for sweep in sorted(listdir(path)):
+            loss_cum = 0
+            fold_list = sorted(listdir(f"{path}/{sweep}"))
+            fold_len = len(fold_list)
+
+            for index, fold in enumerate(fold_list):
+                loss = self.open_object(f"{path}/{sweep}/{fold}/loss.bin")
+                loss_cum += loss['test_loss'][0]
+
+            config_file = self.open_object(f"{path}/{sweep}/{fold}/log.bin")
+            
+            parameter1.append(config_file['train'][parameters[0]])
+            parameter2.append(config_file['train'][parameters[1]])
+            loss_sweep.append(loss_cum / fold_len)
+
+            if loss_sweep[-1] < min_loss:
+                min_loss = loss_sweep[-1]
+                min_parameter1 = parameter1[-1]
+                min_parameter2 = parameter2[-1]
+
+        
+        x=np.unique(parameter1)
+        y=np.unique(parameter2)
+        X,Y = np.meshgrid(x,y)
+        print("min : ", min_loss)
+        print(f"{parameters[0]} : ", min_parameter1)
+        print(f"{parameters[1]} : ", min_parameter2)
+
+        Z= np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
+        plt.xticks(np.arange(len(x)), labels=x)
+        plt.yticks(np.arange(len(y)), labels=y)
+
+        #plt.pcolormesh(X,Y,Z)
+        plt.imshow(Z, norm=colors.LogNorm(), interpolation="bilinear")
+        plt.xlabel(parameters[0])
+        plt.ylabel(parameters[1])
+        plt.colorbar()
+        plt.show()

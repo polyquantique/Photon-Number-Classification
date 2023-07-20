@@ -1,0 +1,826 @@
+{
+ "cells": [
+  {
+   "kind": 1,
+   "value": "### 3 Terminology and Main Loop (runPika)",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "runPIKA[] := (\r\n    initialsetup[];\r\n    readAndFilterData[];\r\n    optionallyRejectBackgroundTraces[];\r\n    graphGlobalMeanTrace[];\r\n\r\n    findDotProductEffectivePhotonNumbers[];\r\n    Do[ (* Loop 1 *)\r\n        createInitialclusters[];\r\n        graphsSampleMiddleClusters[];\r\n        graphClusterMeans[];\r\n        findInitialObjectiveFunction[];\r\n        graphClusterDeviationsFromMean[];\r\n        prepareOptimizationLoop[];\r\n        Do[ (* Loop 2 *)\r\n            preparesubLoop[];\r\n            Do[ (* Loop 3 *)\r\n                getClusterAndNeighbors[];\r\n                updateRelevantDeviations[];\r\n                findCchangeInObjectiveFunction[];\r\n                decideWhetherToMove[];\r\n                updateIfMoving[];\r\n                , {jobs, nobs}\r\n\r\n            ] (* End Loop 3 *)\r\n            updateAnnealingTemperature[];\r\n            , {iCcool, nCool}\r\n\r\n        ]; (* End Loop 2 *)\r\n        prepareAnalysisAndoutput[];\r\n        graphNewSampleMiddleClusters[];\r\n        graphNewClusterMeans[];\r\n        graphProbabilityDistribution[];\r\n        graphNewClusterToMeanDeviations[];\r\n        graphNewMeanToMeanDeviations[];\r\n        graphNewEf fectivePhotonNumber[];\r\n        , {iNPhotonAvgList, Length[nPhotonAvgList]}\r\n    ] (* End Loop 1 *)\r\n    showOutput []\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {
+    "timing": {
+     "startTime": 1689003611240,
+     "endTime": 1689003611346
+    },
+    "executionOrder": 1,
+    "success": true
+   }
+  },
+  {
+   "kind": 2,
+   "value": "initialsetup[] := (\r\n\r\n    SetOptions [$Output, PageWidth -> 110];\r\n    SetOptions[ListPlot, Joined -> True, Frame -> True, PlotRange —> All];\r\n    SetOptions[ListLogPlot, Joined -> True, Frame -> True, PlotRange -> All];\r\n    tstart = TimeUsed[];\r\n\r\n    If [useInputFile, Get [pikaInput]]; (* user defined override x *)\r\n    tAnnealOrig = tAnneal;\r\n\r\n    Print [\"Options read; now running\"];\r\n\r\n    fileInfo = {{partialFilePath, fileExt}, nSamplePerTrace, nTracePerFile};\r\n\r\n    outputCreateTabs[Length [nPhotonAvgList]];\r\n    print[0, \"dataset number (iNPhoton): \", iNPhoton];\r\n    print[0, \"file range (iDataSet): \", iDataSet];\r\n\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "readAndFilterData[] := (\r\n\r\n    print[0, \"PIKA: about to read data. iNPhoton \", iNPhoton];\r\n    dat = readTEsandFilter[iNPhoton, iDataSet, nTime, fileInfo];\r\n    print [0, \"PIKA: {nObs,nTime} \", Dimensions[dat]];\r\n\r\n    If [nDatUse > 0,\r\n        dat = randomSample[dat, nDatUse];\r\n        print[0, \"PIKA: nDatUse ... reduced to {nObs, nTime} \", Dimensions[dat]];\r\n    ];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "optionallyRejectBackgroundTraces[] := (\r\n\r\n    If [backgroundReject,\r\n        iobsKeep = getIObsKeep[dat, peakPosCut, peakValcut, peakNumCut];\r\n\r\n        iobsDrop = Complement [Range [Length[dat]], iObsKeep];\r\n        pl = ListPlot[dat[randomSample[iObsDrop, mSample]], Plotstyle -> Blue,\r\n\r\n            FrameLabel -> {\"t (shorter input units)\", \"V (input units) \"},\r\n            PlotLabel -> ToString[mSample] <> \"rejected traces\",\r\n            ImageSize -> outputImageSize\r\n        ];\r\n\r\n        outputAdd[pl, 0, \"\"];\r\n\r\n        dat = dat[iObsKeep];\r\n        iobsDrop =. ; (* after dat is overwritten these index sets lose their meaning *)\r\n        iobsKeep =.\r\n    ];\r\n\r\n    nObs = Length [dat];\r\n    print [0, \"PIKA: nObs \", nObs, \" traces selected\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphGlobalMeanTrace[] := (\r\n    meanTrace = getMeanOfEachTime[dat];\r\n    p2a = ListPlot[randomSample[dat, mSample], Plotstyle -> Black];\r\n    p2b = ListPlot[meanTrace, PlotStyle -> Red];\r\n    p2 = show[p2a, p2b, DisplayFunction -> $DisplayFunction,\r\n        FrameLabel -> {\"Time (input units)\", \"Voltage (input units)\"},\r\n        PlotLabel -> ToString[mSample] <> \" accepted traces (black) and mean trace (red)\",\r\n        ImageSize -> outputImagesSize];\r\n    Export [\"p2.pdf\", p2];\r\n    outputAdd[p2, 0, \"\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "findDotProductEffectivePhotonNumbers[] := (\r\n    nPhotonAvg = First[nPhotonAvgList];\r\n    nPhotonEff = nPhotonAvg * getDotToIdeal[dat, meanTrace];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "createInitialClusters[] := (\r\n    nPhotonAvg = nPhotonAvgList[iNPhotonAvgList];\r\n    {prob, nPhotonofClust, iObsOfClust, clustMeanTrace} =\r\n        groupProbability[dat, nPhotonAvg, nPhotonEff, nsSigma];\r\n    nClust = Length[clustMeanTrace];\r\n    print[iNPhotonAvgList, \"PIKA: nClust \", nClust];\r\n    printsSp[iNPhotonAvgList, \"Initial mean photon number: \", nPhotonAvg];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphsampleMiddleClusters[] := (\r\n    pda = ListPlot[randomSample[dat[iobsofCclust[Round[nClust /2] -1]], mSample],\r\n        Plotstyle -> Red, DisplayFunction —> Identity];\r\n    pdb = ListPlot[randomSample[dat[iobsofClust[Round[nClust /2] ]], mSample],\r\n        Plotstyle -> Green, DisplayFunction ->Identity];\r\n    pdc = ListPlot[randomSample[dat[iobsofCclust[Round[nClust /2] +1]], mSample],\r\n        Plotstyle -> Blue, DisplayFunction -> Identity];\r\n    p4 = Show [pdc, pdb, pda,\r\n        FrameLabel -> {\"Time (input units)\", \"Voltage (input units)\"},\r\n        PlotLabel -> ToString[mSample] <> \" traces for three clusters n=\" <>\r\n            ToString[nPhotonOfClust [Round [nClust / 2] - 1]] <> \" (red) to n=\"<>\r\n            ToString [nPhotonOfClust [Round [nClust / 2] + 1]] <> \" (blue) \",\r\n        DisplayFunction —> $DisplayFunction,\r\n        ImageSize -> outputImagesSize];\r\n    printsSp[iNPhotonAvgList, \"Sample Traces\", \"Before optimization:\"];\r\n    outputAdd[p4, iNPhotonAvgList, \"Sample Traces\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphClusterMeans[] := (\r\n    p6 = ListPlot [clustMeanTrace,\r\n        Plotstyle -> Green,\r\n        PlotLabel -> \"Cluster mean traces\",\r\n        FrameLabel -> {\"Time (input units)\", \"Voltage (input units)\"},\r\n        ImageSize -> outputImagesSize];\r\n    printsSp[iNPhotonAvgList, \"Cluster Means\", \"Before optimization:\"];\r\n    outputAdd[p6, iNPhotonAvgList, \"Cluster Means\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "findInitialObjectiveFunction[] := (\r\n    sqDevOfClust = getSqDevOfClust [dat, iObsOfClust, clustMeanTrace];\r\n    nofClust = Map[Length, iObsOfClust];\r\n    logLikeProb = probComboLogLikelihocod[nPhotonOfClust, nofClust, nPhotonAvg];\r\n\r\n    sigmaObjFtn = Sqrt[Total[sqDevOfClust] / nObs] // N;\r\n\r\n    print [iNPhotonAvgList, \"PIKA: sigmaObjFtn \", sigmaObjFtn];\r\n    sigmaObjFtn = Table[sigmaObjFtn, {nClust}];\r\n\r\n    objFtn = getObjFtn[sqDevOofClust, sigmaObjFtn, logLikeProb] ;\r\n    printsp[iNPhotonAvgList, \"Initial objective function: \", objFtn];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphClusterDeviationsFromMean[] := (\r\n    p7 = ListPlot[pair[nPhotonotciust, Sqrt[sqDevOfClust / nofClust]],\r\n\r\n    AxesOrigin -> {\r\n        Floor[Min[nPhotonofcClust], 10],\r\n        Floor[Min[Sqrt[sqDevOfClust / nofClust]], 10]\r\n    }\r\n\r\n    Joined -> False,\r\n    Plotstyle -> Pointsize [0.015],\r\n    FrameLabel -> {\"Number of photons n\", \"RMS deviation (Voltage input units)\"},\r\n    PlotLabel -> \"RMS deviations of clusters to their means\", \r\n    ImageSize -> outputImagesSize\r\n    ];\r\n\r\n    printsSp[iNPhotonAvgList, \"Cluster Deviations\", \"Before optimization:\"];\r\n    outputAdd[p7, iNPhotonAvgList, \"Cluster Deviations\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "prepareOptimizationLoop[] := (\r\n\r\n    If [Sort[Flatten[iObsOfClust]] != Range[Length[dat]],\r\n        print [iNPhotonAvgList,\r\n            \"PIKA: WARNING: iObsOfClust does not map each observation to a cluster\"]\r\n    ];\r\n    iclustofobs = getIClustOfObs[iObsOfClust];\r\n    If [Min[iclustOofObs] <= 0,\r\n        print [iNPhotonAvgList,\r\n            \"PIKA: WARNING: iClustOfObs does not map each observation to a cluster\"]\r\n    ];\r\n\r\n    neighborofClust = Transpose[{Range[nClust] -1, Range [nClust] +1}];\r\n    neighborofClust[1] = Drop[neighborofclust[1], 1];\r\n    neighborofClust[-1] = Drop[neighborofCclust[-1], -1];\r\n\r\n    kMove = 0; (* count of moves made *)\r\n    birthofclust = Table[0, {nClust}];\r\n    birthofobsClust = Table[-1, {nObs}, {nClust}]; (* older than birthofClust *)\r\n    sqDevOfObsClust = birthofobsClust (* dummy array of correct shape *)\r\n\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "preparesSubLoop[] := (\r\n    iobsAll = RandomSample[Range [nObs]];\r\n    printsSp[iNPhotonAvgList, \"Detailed Log\", \"Mean \", iNPhotonAvgList, \", round \", iCool,\r\n        \": kMove \", kMove, \" logLikeProb \", logLikeProb,\r\n        \" objFtn \", objFtn, \" TimeUsed \", TimeUsed[] - tsStart];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getClusterAndNeighbors[] := (\r\n    iobs = iObsAll[joObs];\r\n    iclust = iClustofobs [i0bs];\r\n    If [nOfClust[iClust] <= 1, Continue[]];\r\n        neighbor = neighborofClust[iClust];\r\n    jClust = neighbor[RandomInteger[{l, Length[neighbor]}]]\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "updateRelevantDeviations[] := (\r\n    If[birthofObsClust[iObs, iClust] < birthofClust[iClust],\r\n        sqDevOfObsClust[iObs, iclust] = meanSquare[dat[iObs] - clustMeanTrace[iClust]];\r\n        birthofobsClust[iobs, iClust] = kMove\r\n    ];\r\n    If[birthofObsClust[iObs, jClust] < birthofClust[jClust],\r\n        sqDevOfObsClust[iObs, jClust] = meanSquare[dat[iObs] - clustMeanTrace[jClust]];\r\n        birthofobsClust[iobs, jClust] = kMove\r\n    ];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "findchangeInObjectiveFunction[] := (\r\n\r\n    deltal = deltaKMeansDel [nOfClust[iClust], sgDevOfObsClust[iObs, iClust]];\r\n    deltaJd = deltaKMeansAdd[nofClust[jClust], sgDevOfObsClust[iObs, jClust]];\r\n\r\n    deltaKMeansScaled = deltaJ / 2 * sigmaObjFtn[jclust]^2 - deltal / 2 * sigmaObjFtn[iclust]^2\r\n\r\n    deltaProb = If [jClust < iClust,\r\n        deltaPoissonDn[nPhotonOfClust[iClust], nofClust[jClust], nofClust[iClust], nPhotonAvg],\r\n        deltaPoissonUp [nPhotonOfClust[iClust], nofClust[jClust], nofClust[iClust], nPhotonAvg]\r\n    ];\r\n    deltaObjFtn = deltaKMeansScaled - deltaProb;\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "decideWhetherToMove[] := (\r\n    acceptMove = If[deltaObjFtn < 0,\r\n        True,\r\n        If[iCool > nGreedy,\r\n            RandomReal[] < Exp[-deltaObjFtn / tAnneal],\r\n            False\r\n        ]\r\n    ]\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "updateIfMoving[] := (\r\n    If [acceptMove, (* transfer a trace from cluster i to cluster j *)\r\n        printsSp[iNPhotonAvgList, \"Detailed Log\",\" Round \", iCool, \", observation \",\r\n            iObs, \": deltaObjFtn \", deltaObjFtn, \" from \", iclust, \" to \", jClust];\r\n        kMove ++;\r\n        birthofclust[iCclust] = kMove;\r\n        clustMeanTrace[iClust] = newMeanTraceDel[nOfClust[iCclust], clustMeanTrace[iclust], dat[iobs]];\r\n        nofClust[iclust] --;\r\n        birthofclust[jClust] = kMove;\r\n        clustMeanTrace[jClust] = newMeanTraceAdd[nofclust[jClust], clustMeanTrace[jClust], dat[iobs]];\r\n        nofClust[jClust] ++;\r\n        iclustofobs[iObs] = jClust;\r\n        sqDevOfClust[iCclust] -= deltal;\r\n        sqDevOfClust[jCclust] += deltad;\r\n        objFtn += deltaObjFtn;\r\n    ]\r\n    )",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "updateAnnealingTemperature[] := (\r\n    tAnneal *= coolConst\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "prepareAnalysisAndoutput[] := (\r\n    print [iNPhotonAvgList, \"final \", nCool,\" kMove \", kMove, \" logLikeProb \", logLikeProb, \r\n        \" objFtn \", objFtn, \" TimeUsed \", TimeUsed[] - tStart];\r\n\r\n    iobsofclustNew = getIObsOfClust[iClustOfobs];\r\n    iobsofclust0old = i0ObsofClust; (* not changed since before the optimization loop *)\r\n    freqgNew = Map[Length, iObsOfClustNew];\r\n    freqold = Map[Length, iobsofclustold];\r\n    \r\n    nPhotonAvgNew = nPhotonofClust.fregNew / Total [freqNew] // Nj;\r\n\r\n\r\n    print[iNPhotonAvgList, \"nPhotonAvg \", nPhotonAvg,\" nPhotonAvgNew \", nPhotonAvgNew] ;\r\n    printsSp[iNPhotonAvgList, \"\",\"Optimized mean photon number: \", nPhotonAvgNew];\r\n    printsp[iNPhotonAvgList, \"\", \"Optimized objective function: \", objFtn];\r\n)\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphNewsampleMiddleClusters[] := (\r\n    p8a = ListPlot[\r\n        randomsSample[dat[i0bsOfClustNew[Round[nClust /2] -1]], mSample],\r\n        Plotstyle -> Red,\r\n        DisplayFunction -> Identity];\r\n    p8b = ListPlot[\r\n        randomsample[dat[i0bsOfClustNew[Round[nClust /2]]], mSample],\r\n        Plotstyle -> Green,\r\n        DisplayFunction -> Identity];\r\n    p8c = ListPlot[\r\n        randomsSample[dat[i0bsOfClustNew[Round[nClust /2] + 1]], mSample],\r\n        Plotstyle -> Blue,\r\n        DisplayFunction -> Identity];\r\n    p8 = show[p8c, p8b, p8a,\r\n        PlotLabel » ToString[mSample] <> \" traces for three clusters n=\" <>\r\n            ToString[nPhotonOfClust [Round [nClust / 2] - 1] ] <> \" (red) to n=\"<>\r\n            ToString [nPhotonOfClust [Round [nClust / 2] + 1]] <> \" (blue)\", \r\n        FrameLabel -> {\"Time (input units)\", \"Voltage (input units)\"},\r\n        DisplayFunction —> $DisplayFunction,\r\n        ImageSize -> outputImagesSize];\r\n    printsSp[iNPhotonAvgList, \"Sample Traces\", \"After optimization:\"];\r\n    outputAdd[p8, iNPhotonAvgList, \"Sample Traces\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphNewClusterMeans[] := (\r\n    clustFreq = pair[nPhotonofClust, freqNew];\r\n    printsSp[iNPhotonAvgList, \"Numerical Cluster Means\",\r\n        \"After optimization, {nPhotonAvgNew, clustFreq,clustMeanTrace}=\"];\r\n    outputAdd[{nPhotonAvgNew, clustFreq, clustMeanTrace}, iNPhotonAvgList, \r\n        \"Numerical Cluster Means\"];\r\n\r\n    p9a = ListPlot[clustMeanTrace, DisplayFunction -> Identity, Plotstyle -> Blue,\r\n        PlotLabel -> \"Optimized cluster mean traces\", ImageSize -> outputImagesSize];\r\n    p9 = show [p6, p9a, DisplayFunction -> $DisplayFunction,\r\n        PlotLabel -> \"Initial (green) and optimized (blue) cluster mean traces\"];\r\n    printsSp[iNPhotonAvgList, \"Cluster Means\", \"After optimization:\"];\r\n    outputAdd[p9a, iNPhotonAvgList, \"Cluster Means\"];\r\n    outputAdd[p9, iNPhotonAvgList, \"Cluster Means\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphProbabilityDistribution[] := (\r\n    pl0 = ListPlot[\r\n        {pair[nPhotonofcClust, freqold],\r\n         pair[nPhotonofCclust, freqNew],\r\n         pair[prob[All, 1], prob[All, 2] * nObs]},\r\n        Plotstyle -> {Green, Red, Black},\r\n        Joined -> {False, False, True},\r\n        PlotLabel -> \"Initial (green) and final (red) cluster frequencies; \" <> \r\n            probDistName <> \" distribution (black)\",\r\n        FrameLabel -> {\"Number of photons n\", \"Frequencies\"},\r\n        ImageSize -> outputImagesSize\r\n    ];\r\n    outputAdd[pl0, iNPhotonAvgList, probDistName];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphNewClusterToMeanDeviations[] := (\r\n    sgDevClustClust = getsgDevClustClust[dat, iObsOfClustNew, clustMeanTrace];\r\n    sqrtsdccDiag = Table[\r\n        {nPhotonofciust[iclust], Sqrt[sqDevClustClust[iClust, iClust]] }\r\n        {iclust, nclust}];\r\n    sqrtsdccUDiag = Table[\r\n        {nPhotonofciust[iclust], Sqrt[sqDevClustClust[iclust, iClust + 1]]}\r\n        {iclust, nClust - 1}];\r\n    sqrtsdcclDiag = Table[\r\n        {nPhotonofciust[iclust], Sqrt[sqDevCclustClust[iclust, iClust - 1]]}\r\n        {iclust, 2, nClust}];\r\n\r\n    pl3 = ListPlot[{sqrtsdccDiag, sqrtsdccLDiag, sqrtsdccUDiag}, PlotsStyle » {Red, Green, Blue},\r\n        Joined -> True, Frame - True,\r\n        PlotLabel -> \"RMS deviation of cluster traces to means of clusters: R: same; G: +1; B: -1\",\r\n        FrameLabel -> {\"Cluster\", \"RMS deviation (input voltage units)\"},\r\n        ImageSize -> outputImagesSize\r\n        ];\r\n    printsSp[iNPhotonAvgList, \"Cluster Deviations\", \"After optimization:\"];\r\n    outputAdd[pl3, iNPhotonAvgList, \"Cluster Deviations\"];\r\n)\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphNewMeanToMeanDeviations[] := (\r\n\r\n    sgqDevMeanMean = getSqDevClustObs [clustMeanTrace, clustMeanTrace];\r\n    sqrtsdmmDiagl = Table[{nPhotonofciust[iclust], Sqrt[sqDevMeanMean[iclust, iClust +1]]}\r\n        {iclust, nClust - 1}];\r\n    sqrtsdmmDiag2 = Table[{nPhotonofciust[iclust], Sqrt[sqDevMeanMean[iclust, iClust +2]]}\r\n        {iclust, nClust - 2}];\r\n    sqrtsdmmbDiag3 = Table[{nPhotonofciust[iclust], Sqrt[sqDevMeanMean[iClust, iClust + 3]]}\r\n        {iclust, nClust - 3}];\r\n\r\n    pl5 = ListPlot[{sqrtsdmmDiagl, sqrtsdmmDiag2, sqrtsdmmbiag3},\r\n        Plotstyle -> {Red, Green, Blue},\r\n        Joined -> True,\r\n        Frame -> True,\r\n        PlotLabel -> \"RMS deviation of cluster means to each other, R: +1 G: +2 B: +3\",\r\n        FrameLabel -> {\"Cluster\", \"RMS deviation (voltage input units)\"},\r\n        ImageSize -> outputImagesSize\r\n    ];\r\n    outputAdd[pl5, iNPhotonAvgList, \"Cluster Deviations\"];\r\n)\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "graphNewEffectivePhotonNumber[] := (\r\n    nPhotonEff = getNPhotonEff[dat, nPhotonOfClust, clustMeanTrace];\r\n    binEdge = Table[nEff,\r\n        {nEff,\r\n            (Floor[Min[nPhotonEff] / binFract] - 1/2) * binFract,\r\n            (Ceilling[Max[nPhotonEff] / binFract] + 1/2) * binFract,\r\n            binFract}\r\n    ];\r\n\r\n    binCnt = BinCounts[nPhotonEff,\r\n        {(Floor[Min[nPhotonEff] / binFract] - 1/2) * binFract,\r\n         (Ceilling[Max[nPhotonEff] / binFract] + 1/2) * binFract,\r\n        binFract}\r\n    ];\r\n\r\n    binCtr = (Most[binEdge] + Rest[binEdge]) / 2\r\n\r\n    paircnt = pair[binCtr, binCnt];\r\n    paircntPlot = pair[binCtr, Table[If[binCnt[i] < 0.5, 0.5, binCnt[i]], {i, Length[binCcnt]}]];\r\n\r\n    p17 = ListLogPlot[pairCntPlot,\r\n        PlotLabel -> \"Effective photon number histogram (bin width \" <>TextString[binFract] <>\")\",\r\n        FrameLabel -> {\"Photon number\", \"counts\"},\r\n        ImageSize -> outputImagesSize\r\n    ];\r\n    outputAdd[pl7, iNPhotonAvgList, \"Effective Photon Numbers\"];\r\n\r\n    printsSp[iNPhotonAvgList, \"Numerical n_eff Bin Counts\",\r\n        \"First element is bin center; second is bin count.\"];\r\n    outputAdd[pairCnt, iNPhotonAvgList, \"Numerical n_eff Bin Counts\"];\r\n    printsSp[iNPhotonAvgList, \"Numerical n_eff\", \"Effective photon number for each observation:\"];\r\n    outputAdd[nPhotonEff, iNPhotonAvgList, \"Numerical n_eff\"];\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "showOutput[] := (\r\n    tEnd = TimeUsed[];\r\n    print[0, \"PIKA: time used: \", tEnd-tStart, \" s\"];\r\n    outputsShowTabView[]\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "deltaKMeansAdd[\r\n    freq_, (* size of the cluster to be added to *)\r\n    meanSquareDiff_ (* mean square of the difference between the waveform to be transferred and the\r\n        cluster mean waveform *)\r\n    ] :=\r\n    (freq / freq+1) * meansSquareDiff\r\n\r\n    deltaKMeansDel[\r\n        freq , (* size of the cluster to be removed from *)\r\n        meanSquareDiff_ (* mean square of the difference between the waveform to be transferred and the\r\n            cluster mean waveform *)\r\n    ] := \r\n    (freq / freq-1) * meansSquareDiff\r\n\r\n    newMeanTraceAdd[freq_ , oldMeanTrace_, transferTrace_] := (freq * oldMeanTrace + transferTrace) / freq+1\r\n\r\n    newMeanTraceDel [freq_ , oldMeanTrace_, transferTrace_] := (freq * oldMeanTrace - transferTrace) / freq-1\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 5.2 Updating de Poisson Log-Likelihood",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "(* from n to n+l *)\r\ndeltaPoissonUp = Compile [{\r\n\r\n    {nDel, _Integer}, (* cluster number from which to remove the waveform *)\r\n\r\n    {freqAdd, _Integer}, (* size of the cluster to be added to *)\r\n    {freqDel, _Integer}, (* size of the cluster to be removed from *)\r\n    {mu, _Real} (* mean photon number *)\r\n    },\r\n    Log[mu * freqDel / ((nDel +1)  (freqAdd +1))]\r\n];\r\n(* from n to n-1 *)\r\ndeltaPoissonDn = Compile [{\r\n    {nDel, _Integer},\r\n    {freqAdd, _Integer},\r\n    {freqDel, _Integer},\r\n    {mu, _Real}\r\n    },\r\n    Log[nDel * freqgDel / (mu * (freqAdd+1))]\r\n];\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.1 General Purpose",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "boundList[list_, min_, max_] := (\r\n    Module[{i}, Table[Median[{list[i], min, max}],\r\n        {i, Length[list]}]]\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getDotTolIdeal [traces_, idealTrace_] := (\r\n    traces.idealTrace / idealTrace.idealTrace\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getMeanOfEachTime[dat_] := Map [Mean, Transpose[dat]]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getSquareDiff [dat_, clustMeanTrace_] :=\r\n    Module [{iClust, iObs, x},\r\n        Table[x = dat [i0bs] - clustMeanTrace[iClust]; x.x,\r\n            {iobs, Length[dat]}, {iClust, Length[clustMeanTrace]}]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "groupCommon[x_] := {x[1, 2], x[All, 1]}",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "meanSquare[x_] := x.x / Length[x]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "pair[x_, y_] := Transpose[{x, y}]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "randomSample[list_, m_] :=\r\n    Randomsample[list, Min[m, Length[list]]]\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "twoMin[z_] := Ordering[z, 2]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.2 Effective Photon Number",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getNPhotonEff [dat_, nPhotonList_, clustMeanTrace_] :=\r\n    Module [{alphaByClustPair},\r\n        alphaByClustPair = getAlphaByClustPair[dat, clustMeanTrace];\r\n        getNPhotonEff [alphaByClustPair, nPhotonList]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getAlphaByClustPair[dat_, idealTraceList_] :=\r\n    Module [ {iObsTwoMinIndex, iObsTwoMinIndexGroup, msDev,\r\n            nClustPair, nObs, twoMinIndex, twoMinIndexIObsList},\r\n        nObs = Length [dat];\r\n        msDev = getSquareDiff[dat, idealTraceList];\r\n        twoMinIndex = Map [twoMin, msDev];\r\n        iobsTwoMinIndex = pair [Range [nObs], twoMinIndex];\r\n        iobsTwoMinIndexGroup =\r\n            GatherBy [iObsTwoMinIndex, Last [#] &];\r\n        twoMinIndexIObsList =\r\n            Sort [Map [groupCommon, iObsTwoMinIndexGroup]];\r\n        nClustPair = Length [twoMinIndexIObsList];\r\n        Table[\r\n            {twoMinIndexIObsList[iclustPair, 1],\r\n            twoMinIndexIObsList[ iclustPair, 2],\r\n            getAlpha[dat[twoMinIndexIObsList[iclustPair, 2]],\r\n                idealTraceList[twoMinIndexIObsList[iClustPair, 1]]]\r\n            }\r\n        , {iClustPair, nClustPair}]\r\n    ]\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getAlpha[traces_, idealTraceAB_] :=\r\n    Module[{alpha, diffIdealTrace, idealTraceR, nObs},\r\n        nObs = Length[traces];\r\n        diffIdealTrace = Apply[Subtract, idealTraceAB];\r\n        idealTraceA = First[idealTraceAB];\r\n        alpha = getDotToIdeal[\r\n            Table[idealTraceA - traces[iObs], {iObs, nObs}],\r\n            diffIdealTrace]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getNPhotonEff [alphaByClustPair_, nPhotonList_] :=\r\n    Module [{alpha, clustPair, iiobs, iObs, nObs, nPhotonPair},\r\n        alpha = Flatten[alphaByClustPair[All, 3]];\r\n        iobs = Flatten[alphaByClustPair[All, 2]];\r\n        clustPair = Flatten[\r\n            Table[\r\n                Table[alphaByClustPair[iCclustPair, 1],\r\n                    {Length[alphaByClustPair[iClustPair, 3]]}\r\n                ],\r\n                {iclustPair, Length [alphaByClustPair]}\r\n            ],\r\n        ];\r\n        iiobs = Ordering [iObs];\r\n        alpha = alpha[iiobs];\r\n        clustPair = clustPair[iiobs];\r\n        nObs = Length[alpha];\r\n        nPhotonPair = Table[nPhotonList[clustPair[jobs]],\r\n            {jobs, nobs}];\r\n        (1-alpha) * nPhotonPair[All, 1] + alpha * nPhotonPair[All, 2]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.3 Background Rejection",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIObsKeep[dat_, peakPosCut_, peakvValCut_, peakNumCut_] :=\r\n    Module [{datPeakLoc, iObsDropA, datPeakLocVal,\r\n        datPeakLocValBig, datPeakNum, iObsDrop, iObsKeep,\r\n        peakPosList, peakValList},\r\n        {peakPosList, peakValList} = getMaxAndPosList[dat];\r\n        (* peak position and value for each obs *)\r\n        iobsDrop = getIObsDrop [peakPosList, peakValList,\r\n            peakPosCut, peakvValCut];\r\n        iobsDropA = getIObsDropA[dat, peakValcut];\r\n        iobsDrop = Union [iObsDrop, iObsDropA];\r\n        datPeakLoc = getDatPeakLoc[dat];\r\n        datPeakLocVal = getDatPeakLocVal[datPeakLoc, dat];\r\n        datPeaklocValBig = getDatPeakLocValBig[datPeakLocVal,\r\n            peakValcut];\r\n        datPeakNum =\r\n            Map[First, Map[Dimensions, datPeakLocValBig]];\r\n        iobsKeep = getIObsKeepA[datPeakNum, iObsDrop, peakNumCut]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "posMax[z_] := First[First[Position[z, Max[z]]]]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getMaxAndPosList[dat_] :=\r\n    Module[{peakPosList, peakValList},\r\n        peakPosList = Map [posMax, dat];\r\n        peakValList = Map [Max, dat];\r\n        {peakPosList, peakValList}\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIObsDrop [peakPosList_, peakValList_, peakPosCut_, peakvalCut_] :=\r\n    Module [{iObsDrop, nObs},\r\n        nObs = Length[peakPosList];\r\n        iobsDrop = Pick[Range[nObs],\r\n        MapThread[And, {Thread[peakValList >= peakValcut],\r\n            Thread[peakPosList >= peakPosCut]}]\r\n        ]\r\n    ]    ",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIObsDropA[dat_, peakvalCut_] :=\r\n    Module [{nObs},\r\n        nObs = Length [dat];\r\n        Pick[Range [nObs], MapThread[Or,\r\n            {Thread[dat[All, +1] >= peakValcut],\r\n            Thread[dat[All, -1] >= peakValcCut]}]\r\n        ]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "peakList[f_] :=\r\n    Pick[Range[Length[f]],\r\n        MapThread[And,\r\n            {Thread[f >= RotateRight[f]],\r\n            Thread[f > RotateLeft[f]]}]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getDatPeakLoc[dat_] := Map[peakList, dat]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getDatPeakLocVal [datPeakLoc_, dat_] :=\r\n    Table[\r\n        pair[datPeakLoc[iObs], dat[ iObs, datPeakLoc[iObs]]],\r\n        {iObs, Length[dat]}]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getDatPeakLocValBig[datPeakLocVal_, peakValCut_] :=\r\n    Table[\r\n        Select [datPeakLocVal[iObs], Last[#] >= peakValCut &],\r\n        {iobs, Length[dat]}]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIObsKeepA[datPeakNum_, iObsDrop_, datPeakNumCut_] :=\r\n    Complement[\r\n        Pick[Range[Length[datPeakNum]],\r\n        Thread[datPeakNum < datPeakNumCut]], \r\n        iobsDrop]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.4 Cluster Organization",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIClustOfObs[iObsOfClust_] :=\r\n    Module[{iClustOofObs, nClust, nObs},\r\n        nClust = Length[iObsOofClust];\r\n        nObs = Max[Flatten[iObsOfClust]];\r\n        iclustofobs = Table[0, {nObs}];\r\n        Do[iCclustOofObs[iObsOfclust[iclust]] = iClust,\r\n            {iclust, nClust}];\r\n        iclustofobs\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getIObsOfClust[iClustOfObs_] :=\r\n    Module[{iObsGroup},\r\n        iobsGroup =\r\n            GatherBy[\r\n                Transpose[{Range[Length[iClustOofobs]], iClust0ofObs}],\r\n                Last[#] &];\r\n        Sort[Map[groupCommon, iObsGroup]] [A1ll, 2]\r\n    ]\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "groupProbability[dat_, nPhotonAvg_, nPhotonEff_ , nSigma_] :=\r\n    Module[{prob},\r\n        prob = poisson[nPhotonAvg, nSigma];\r\n        Prepend[groupProb[dat, prob, nPhotonEff], prob]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "groupProb[dat_, prob_, nPhotonEff] :=\r\n    Module [{nPhotonEffSortIndex, keep, nObs, nPhoton,\r\n        nPhotonUse, probCum, probIndex, probIndexStart,\r\n        probIndexstop, probList, probNPhotonUse,\r\n        probIndexStartUse, probIndexStopUse},\r\n    nPhotonEf fSortIndex = Ordering [nPhotonEff];\r\n        {nPhoton, probList} = Transpose[prob];\r\n    nObs = Length [dat];\r\n    probCum = Prepend [Accumulate [probList], 0];\r\n    probCum /= Last [probCum];\r\n    probIndexsStart = boundList [1 + Round [Most [nObs * probCum]],\r\n        1, nobs +1];\r\n    probIndexStop = boundList [Round [Rest [nObs % probCum]],\r\n        0, nObs];\r\n    keep = Thread [probIndexStart <= probIndexsStop];\r\n    (* no zero length bins *)\r\n    nPhotonUse = Pick[nPhoton, keep];\r\n    probIndexsStartUse = Pick[probIndexStart, keep];\r\n    probIndexStopUse = Pick[probIndexsStop, keep];\r\n    nClust = Length [probIndexStartUse];\r\n    iobsofclust = Table [nPhotonEffSortIndex[\r\n        Range[probIndexsStartUse[iClust],\r\n            probIndexstopUse[iClust]]\r\n        ],\r\n        {iClust, nClust}];\r\n    clustMeanTrace = Table[\r\n        getMeanOfEachTime[dat[i0bsOfClust[iCclust]]],\r\n        {iClust, nClust}];\r\n    {nPhotonUse, iObsOfClust, clustMeanTrace}\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.5 Probability and Log-Likelihood",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "comboLogLikelihood[freqList_] :=\r\n    LogGamma[Total[freqList] +1.] -\r\n        Total[LogGamma[freqList +1.]]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "poissonLogLikelihood[nList_, freqList_, mu_] :=\r\n    -mu * Total[freqList] + nList.freqlList * Log[mu] -\r\n        freqList.LogGamma[nList + 1.]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "probComboLogLikelihood[nList_, freqList_, mu_] :=\r\n    poissonLogLikelihood[nList, freqList, mu] +\r\n        comboLogLikelihood[freqList]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "poisson[mu_, nSigma_] := \r\n    Module[\r\n        {sigma, tab},\r\n        sigma = Sqrt[mu];\r\n        tab = Table[{n, (N[Exp[-mu]] +mu”n) /n!},\r\n            {n, Max [Floor[mu- sigma * nSigma], 0],\r\n            Ceiling [mu + sigma x nSigma] }];\r\n        Map[ {First [#], Last[#] / Total [tab[[All, 2]]]} &, tab]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [
+    {
+     "items": [
+      {
+       "data": "<pre>Syntax error Token`Error`UnexpectedCloser at line 5 column 41</pre>",
+       "mime": "x-application/wolfram-language-html"
+      },
+      {
+       "data": "\"Syntax error Token`Error`UnexpectedCloser at line 5 column 41\"",
+       "mime": "text/plain"
+      }
+     ],
+     "id": "45b3b58b-daf6-4d4b-b3f0-63245d4b590a",
+     "metadata": {
+      "cellLabel": "",
+      "isBoxData": false
+     }
+    }
+   ],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.6 Deviation and Objective Function Measurement",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getsqDevClustObs [dat_, clustMeanTrace_] :=\r\n    Table[\r\n        meansSquare [dat [iObs] - clustMeanTrace[jClust]],\r\n        {jclust, Length [clustMeanTrace]}, {iObs, Length[dat]}\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getsqDevClustClust [dat_, iObsOfClust_, clustMeanTrace_] :=\r\n    Map [Mean,\r\n        Table[\r\n            getSqDevClustObs[dat[iObsOfclust[iclust]], clustMeanTrace],\r\n            {iclust, Length[iObsOfClust]}\r\n        ],\r\n        {2}\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getObjFtn[sqDevOfClust_, sigmaObjFtn_, logLikeProb_] :=\r\n    Total[sqDevOfClust / (2 * sigmaObjFtn^2)] - logLikeProb",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getsqDevInClust [datInClust_, meanTraceInClust_] :=\r\n    Total[\r\n        Table[meanSquare[datInClust[jObs] - meanTraceInClust],\r\n            {jobs, Length[datInClust]}]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "getsqDevOfClust[dat_, iObsOfClust_, clustMeanTrace_] :=\r\n    Table[\r\n        getSgDevInClust[dat[iObsOfClust[iclust]], clustMeanTrace[iClust]],\r\n        {iclust, Length [clustMeanTrace]}]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.7 Reading and Filtering Data",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "readTES [iNPhoton_, iDataSet_, fileInfo_] :=\r\n    Module[{fileNameA, nSamplePerTrace, nFile, fileNamePart,\r\n        nTracePerFile, nTrace, dat, serialNumber, fileName,\r\n        dim, datImport},\r\n        {fileNamePart, nSamplePerTrace, nTracePerFile} = fileInfo;\r\n        fileNameA = fileNamePart[1] <> IntegersString[iNPhoton] <>\r\n            fileNamePart [2];\r\n        nFile = Length[iDatasSet];\r\n        nTrace = nTracePerFile x nFile;\r\n        dat = ConstantArray[{}, nTrace];\r\n        Do[\r\n            serialNumber = IntegersString[iDataset[iFile], 10, 2];\r\n            (* padding to ensure 2 digits *)\r\n            fileName = fileNameA <> serialNumber;\r\n            If[Not[FileExistsQ[fileName]],\r\n                Print[\"readTEsSdata: \"<>fileName<>\" does not exist\"];\r\n                Abort[]\r\n            ];\r\n            datImport =\r\n                Partition [Import [fileName, \"UnsignedInteger16\"],\r\n                    nSamplePerTrace];\r\n            dat[(iFile-1) * nTracePerFile+ 1 ;; iFile * nTracePerFile] =\r\n                datImport,\r\n                {iFile, nFile}\r\n        ];\r\n        dim = Dimensions[dat];\r\n        If [dim != {nTrace, nSamplePerTrace},\r\n            Print[\"readTESdata: unexpected values for dim\", dim];\r\n            Print[\"readTEsdata: expected \",\r\n                {nTrace, nSamplePerTrace}];\r\n            Abort []\r\n        ];\r\n        dat\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "applyFiltershort([x_, filtershort_] :=\r\n    Module [{ft, ftShort, nFT},\r\n        ft = Fourier[x, FourierParameters » {1, 1}];\r\n        nFT = Length [ft];\r\n        ftshort = Flatten[\r\n            {Take[ft, nFT/ 4],\r\n            0,\r\n            Take[ft, {(3/4) * nFT + 2, nFT}]}\r\n            ];\r\n        Chop[InverseFourier[ftShort * filtershort,\r\n            FourierParameters -> {1, 1}] / 2]\r\n    ]",
+   "languageId": "wolfram",
+   "outputs": [
+    {
+     "items": [
+      {
+       "data": "<pre>Syntax error at character 17</pre>",
+       "mime": "x-application/wolfram-language-html"
+      },
+      {
+       "data": "\"Syntax error at character 17\"",
+       "mime": "text/plain"
+      }
+     ],
+     "id": "5052928b-ebcd-4585-abf7-e6eeb60ca667",
+     "metadata": {
+      "cellLabel": "",
+      "isBoxData": false
+     }
+    }
+   ],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "hanningFilter[n_] := Chop[Cos[(N[Pi] * Range[0, n-1])/n]^2]\r\n",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "readTESandFilter[iNPhoton_, iDataSet_, nTime_, fileInfo_] :=\r\n    Module[{datUse, dat, datFilt, nTimeUse, nSamplePerTrace, nTracePerFile, nFile},\r\n        {nsamplePerTrace, nTracePerFile} = fileInfo[{2, 31}];\r\n    nFile = Length[iDatasSet];\r\n    datUse = ConstantArray[{}, nTracePerFile * nFile];\r\n    Do[\r\n        dat = readTES[iNPhoton, {iDataSet[iFile]}, fileInfo];\r\n        hanning = hanningFilter[Last[Dimensions [dat]] / 2];\r\n        datFilt = Map[applyFiltershort[#, hanning] &, dat];\r\n        nTimeUse = Min[nTime, Length [hanning]];\r\n        datUse[(iFile - 1) * nTracePerFile +1 ;; \r\n            iFile * nTracePerFile] = datFilt[All, Range [nTimeUse]],\r\n        {iFile, nFile}\r\n    ];\r\n    datUse -= Mean[datUse[All, 10]] \r\n    (*zeroes the signal at an early point,\r\n    before any photons have arrived *)\r\n]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.8 Output Organization",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "outputCreateTabs [nRuns_] := (\r\n    outputContentTable = ConstantArray[{}, nRuns];\r\n    outputNameList = {};\r\n    outputTopList = ConstantArray[{}, nRuns];\r\n    outputGenerallLog = {};\r\n    outputGeneralGraphics = {};\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "outputAdd[expr_, iRun_, name_] := Module[{iName},\r\n    If[iRun == 0,\r\n        If [name == \"Log\",\r\n            outputGeneralLog = Append [outputGenerallog, expr];\r\n            ,\r\n            outputGeneralGraphics =\r\n                Append [outputGeneralGraphics, expr];\r\n\r\n        ]\r\n        ,\r\n        If[name == \"\",\r\n            outputTopList[iRun] = Append [outputTopList[iRun], expr];\r\n            ,\r\n            If[MemberQ[outputNameList, name],\r\n                iName = First[First[Position[outputNameList, name]]];\r\n                outputContentTable[iRun, iName] =\r\n                    Append[outputContentTable[iRun, iName], expr];\r\n                ,\r\n                outputNameList = Append[outputNameList, name];\r\n                outputContentTable =\r\n                    Map[Append[{}], outputContentTable];\r\n                outputContentTable[[iRun, -1] = {expr};\r\n                ]\r\n            ]\r\n        ]\r\n    ]  (* end Module *)",
+   "languageId": "wolfram",
+   "outputs": [
+    {
+     "items": [
+      {
+       "data": "<pre>Syntax error at character 845</pre>",
+       "mime": "x-application/wolfram-language-html"
+      },
+      {
+       "data": "\"Syntax error at character 845\"",
+       "mime": "text/plain"
+      }
+     ],
+     "id": "942b2b49-cf6e-4519-9eab-658ba649b0bd",
+     "metadata": {
+      "cellLabel": "",
+      "isBoxData": false
+     }
+    }
+   ],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "outputshowTabView[] :=\r\n    Module[{columnsNames, labelTableNames, viewsRuns,\r\n        columnsRuns, labelTableRuns, generalTabView,\r\n        labelTableRunsGeneral},\r\n        columnsNames = Map [Column, outputContentTable, {2}];\r\n        labelTableNames =\r\n            Table[outputNameList[jName] -> columnsNames[jRun, jName],\r\n                {jRun, Length[outputContentTable]},\r\n                {jName, Length[outputNameList]}];\r\n        viewsRuns =\r\n            Map[TabView[#, Appearance -> {\"Limited\", 5},\r\n                ImageSize -> Automatic] &, labelTableNames];\r\n        columnsRuns =\r\n            Map[Column, MapThread[Append,\r\n                {outputTopList, viewsRuns}]];\r\n        labelTableRuns =\r\n            Table[\"Run \" <>ToString[jRun] -> columnsRuns[jRun],\r\n                {jRun, Length[outputContentTable]}];\r\n        generalTabView =\r\n            TabView[{ \"Log\" -> Column [outputGenerallog],\r\n                \"Graphics\" -> Column [outputGeneralGraphics],\r\n                \"Options\" ->\r\n                    TableForm[\r\n                        Table[{varNames[i], If [varNames[i] == \"tAnneal\",\r\n                            tAnnealOrig, ToExpression[varNames[i]]]},\r\n                            {i, Length [varNames]}]]},\r\n            Appearance -> {\"Limited\", 15}, ImageSize -> Automatic];\r\n        labelTableRunsGeneral =\r\n            Prepend[labelTableRuns, \"General\" - generalTabView];\r\n        TabView[labelTableRunsGeneral,\r\n        Appearance -> {\"Limited\", 15}, ImageSize -> Automatic]\r\n]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "print [iRun_, args__] :=\r\n    outputAdd[OutputForm[StringJoin[Map[ToString, {args}]]],\r\n        iRun, \"Log\"]\r\n\r\nprintsp[iRun_, name_, args__] :=\r\n    outputAdd[OutputForm[StringJoin[Map [ToString, {args}]]],\r\n        iRun, name]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 1,
+   "value": "### 7.9 Form Input and Runner",
+   "languageId": "markdown",
+   "outputs": [],
+   "metadata": {
+    "attachments": {}
+   },
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "pika[] := Module[{form},\r\n    form = FormObject [{\r\n        Style[\"General\", Bold],\r\n        makeField[\"iNPhoton\", \"Integer\", \"Index of the dataset to read in\", 16],\r\n        makeField[\"iDatasSet\", ToExpression, \"Parts of dataset to use\", {0, 1, 2, 3},\r\n            \"Help\" -> \"Normal expressions (e.g., Range[0,3]) will work here\"],\r\n        makeField[\"nTime\", \"Integer\", \"Number of time points after filtration\", 512],\r\n        makeField[\"mSample\", \"Integer\", \"Number of traces to randomly sample\", 100,\r\n            \"Help\" ->\r\n                \"Actually a maximum number to sample, only reached if the population is large enough\"],\r\n        makeField[\"nDatUse\", \"Integer\", \"Number of traces to use (if 0, use all)\", 0],\r\n\r\n        Style[\"\\nBackground Radiation Rejection\", Bold],\r\n        makeField[\"backgroundReject\", \"Boolean\", \"Reject background traces\", False],\r\n        makeField[\"peakValCcut\", \"Integer\", \"Voltage cutoff\", 275],\r\n        makeField[\"peakPosCut\", \"Integer\", \"Time cutoff\", 17],\r\n        makeField[\"peakNumCut\", \"Integer\", \"cutoff for number of peaks\", 2],\r\n\r\n        Style[\"\\nIteration and Simulated Annealing\", Bold],\r\n        makeField[\"nCool\", \"Integer\", \"Total number of optimization rounds\", 60,\r\n            \"Help\" -> \"Includes both greedy and simulated annealing rounds\"],\r\n        makeField[\"nGreedy\", \"Integer\", \"Number of greedy rounds\", 60,\r\n            \"Help\" -> \"Greedy rounds come before simulated annealing; simulated annealing will \r\n                not run if nCool==nGreedy\"],\r\n        makeField[\"coolConst\", \"Number\", \"Simulated annealing cooling constant\", 0.99],\r\n        makeField[\"tAnneal\", \"Number\", \"Simulated annealing starting temperature\", 0.02],\r\n\r\n        style[\"\\nProbability\", Bold],\r\n        makeField[\"probDistName\", \"String\", \"Name of the probability distribution\", \"Poisson\"],\r\n        makeField[\"nSigma\", \"Integer\", \"Extent of probability distribution\", 10,\r\n            \"Help\" -> \"Number of standard deviations away from the mean to generate\"],\r\n\r\n        Style[\"\\nOutput\", Bold],\r\n        makeField[\"binFract\", \"Number\", \"Histogram bin width (fraction of a photon)\", 0.05],\r\n        makeField[\"outputImagesize\", \"Integer\", \"Default image size for plots\", 400],\r\n\r\n        style[\"\\nInput\", Bold],\r\n        makeField[\"nPhotonAvgList\", ToExpression, \"List of mean photon numbers to test\", {1.49608}],\r\n        \"The data filenames should be of the form data-1.daq0l, with the \\\"data-\\\" and\r\n        \\\".dag\\\" being an arbitrary prefix and file extension, the first number being\r\n        iNPhoton, and the second number being a two-digit form of iDataset.\",\r\n\r\n        makeField[\"partialFilePath\", \"String\", \"Path to data files\", \"[directory]\\\\TES_E0019-\",\r\n            \"Help\" -> \"Should include the first (generic) part of the filenames of the data files,\r\n                without iNPhoton or iDataSet specifications\"],\r\n        makeField[\"fileExt\", \"String\", \"File extension of data files\", \".daq\",\r\n            \"Help\" -> \"Should not include iDataSet specification\"],\r\n        makeField[\"nSamplePerTrace\", \"Integer\", \"Number of samples per trace\", 8192],\r\n        makeField[\"nTracePerFile\", \"Integer\", \"Number of traces per file\", 512],\r\n        makeField[\"useInputFile\", \"Boolean\", \"Use separate input file\", False],\r\n        makeField[\"pikaInput\", \"String\", \"Separate input file\", \"\", \r\n            \"Control\" -> (FileNameSetter[#, \"Open\", {\"Mathematica packages\" -> {\"x.m\"}}] &),\r\n            \"Required\" -> False]\r\n        }];\r\n    FormFunction[form, runFromAssociation][]\r\n]",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "makeField[name_, type_, labelPart_, defaultContents_, args___] := name -> <|\r\n    \"Interpreter\" -> type,\r\n    \"Label\" -> overlay[{name, \"\\t\\t | \"<>labelPart}],\r\n    \"Input\" -> defaultContents,\r\n    args\r\n|>",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "runFromAssociation[formAssoc_] := (\r\n    varNames = Keys[formAssoc] ;\r\n    varValues = Values[formAssoc] ;\r\n    Do[\r\n        Clear[Evaluate[varNames[ivar]]];\r\n        Evaluate[ToExpression[varNames[ivar]]] = varValues[ivar],\r\n        {ivar, Length[varNames]}\r\n    ];\r\n    runPIKA[]\r\n)",
+   "languageId": "wolfram",
+   "outputs": [],
+   "metadata": {},
+   "executionSummary": {}
+  },
+  {
+   "kind": 2,
+   "value": "\r\n",
+   "languageId": "wolfram",
+   "outputs": [
+    {
+     "items": [
+      {
+       "data": "<pre><span class=\"wl-message\">FormFunction::nofe</span>: \n   A front end is not available. This action requires a front end.</pre>",
+       "mime": "x-application/wolfram-language-html"
+      },
+      {
+       "data": "FormFunction::nofe: \n   A front end is not available. This action requires a front end.",
+       "mime": "text/plain"
+      }
+     ],
+     "id": "5d2a30a3-785b-40d6-b624-5bafef9e137a",
+     "metadata": {
+      "cellLabel": "",
+      "isBoxData": false
+     }
+    },
+    {
+     "items": [
+      {
+       "data": "<div class=\"wexpr\"><w>$Failed</w></div>",
+       "mime": "x-application/wolfram-language-html"
+      },
+      {
+       "data": "$Failed",
+       "mime": "text/plain"
+      }
+     ],
+     "id": "308ff58e-89ce-4941-98d1-f91743cad2e0",
+     "metadata": {
+      "cellLabel": "Out[158]= ",
+      "isBoxData": false
+     }
+    }
+   ],
+   "metadata": {},
+   "executionSummary": {}
+  }
+ ]
+}
