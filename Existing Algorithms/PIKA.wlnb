@@ -16,14 +16,7 @@
    "languageId": "wolfram",
    "outputs": [],
    "metadata": {},
-   "executionSummary": {
-    "timing": {
-     "startTime": 1689003611240,
-     "endTime": 1689003611346
-    },
-    "executionOrder": 1,
-    "success": true
-   }
+   "executionSummary": {}
   },
   {
    "kind": 2,
@@ -645,7 +638,7 @@
   },
   {
    "kind": 2,
-   "value": "applyFiltershort([x_, filtershort_] :=\r\n    Module [{ft, ftShort, nFT},\r\n        ft = Fourier[x, FourierParameters » {1, 1}];\r\n        nFT = Length [ft];\r\n        ftshort = Flatten[\r\n            {Take[ft, nFT/ 4],\r\n            0,\r\n            Take[ft, {(3/4) * nFT + 2, nFT}]}\r\n            ];\r\n        Chop[InverseFourier[ftShort * filtershort,\r\n            FourierParameters -> {1, 1}] / 2]\r\n    ]",
+   "value": "applyFiltershort([x_, filtershort_] :=\r\n    Module [{ft, ftShort, nFT},\r\n        ft = Fourier[x, FourierParameters » {1, 1}];\r\n        nFT = Length [ft];\r\n        ftshort = Flatten[\r\n            {Take[ft, nFT/ 4],\r\n            0,\r\n            Take[ft, {(3/4) * nFT + 2, nFT}]}\r\n            ];\r\n        Chop[InverseFourier[ftShort * filtershort,\r\n            FourierParameters -> {1, 1}] / 2]\r\n    ])",
    "languageId": "wolfram",
    "outputs": [
     {

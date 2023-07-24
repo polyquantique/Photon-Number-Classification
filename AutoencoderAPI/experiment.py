@@ -10,138 +10,25 @@ import torch.onnx
 from torch import nn
 import torch.optim as optim
 
-from sklearn.model_selection import KFold, train_test_split, ParameterGrid
+from sklearn.model_selection import KFold, ParameterGrid
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+
+from kmeans_pytorch import kmeans
 
 from tqdm.notebook import tqdm
 import pickle
 import warnings
+from torch.utils.data import SubsetRandomSampler, DataLoader, Subset
+
+from AutoencoderAPI import dataset, autoencoder #, transformer
 
 plt.style.use("seaborn-pastel")
 
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)
 
-
-
-class build_autoencoder(nn.Module):
-    def __init__(self, config: dict) -> None:
-        """
-        # build_autoencoder
-
-        __init__(config)
-
-        Build a Pytorch autoencoder based on a CNN (convolution neural network) architecture with desired caracteristics. 
-
-        Parameters
-        ----------
-        config : dict
-                Dictionary containing the CNN desired caracteristics. 
-                See the `autoencoder` class for more details on the config dictionary
-
-        Returns
-        -------
-        None
-        """
-        super(build_autoencoder, self).__init__()
-        
-        if config['run']['layer_number'] % 2 != 0:
-            print("Invalid number of layer (needs to be even number)")
-
-        # Layer type
-        layer_type_dict = {
-            "Linear" : nn.Linear
-        }
-        layer = layer_type_dict[config['network']['layer_type']]
-
-        # Activation function
-        activation_dict = {
-            "ReLU"       : nn.ReLU,
-            "Sigmoid"    : nn.Sigmoid,
-            "CELU"       : nn.CELU, 
-            "Softmax"    : nn.Softmax,
-            "Softmin"    : nn.Softmin,
-            "Hardshrink" : nn.Hardshrink,
-            "LeakyReLU"  : nn.LeakyReLU,
-            "ELU"        : nn.ELU,
-            "LogSigmoid" : nn.LogSigmoid,
-            "PReLU"      : nn.PReLU,
-            "GELU"       : nn.GELU,
-            "SiLU"       : nn.SiLU,
-            "Mish"       : nn.Mish,
-            "Softplus"   : nn.Softplus,
-            "Softsign"   : nn.Softsign,
-            "Tanh"       : nn.Tanh,
-            "GLU"        : nn.GLU,
-            "Threshold"  : nn.Threshold,
-        }
-
-        # Number of layer
-        #encoder_layers = np.linspace(config["input_dimension"], config["output_dimension"], int(config['layer_number'] / 2 + 1), dtype=int)
-        #layer_list = np.concatenate((encoder_layers, np.flip(encoder_layers)[1:]))
-        skip = config['network']["skip_elements"]
-        size = config['files']['input_dimension']
-        layer_list = config['run']['layer_list']
-        layer_list[0] = layer_list[-1] = int(size / skip)
-        activation_list = config['run']['activation_list']
-        
-        # Build network
-        self.encoder = nn.Sequential()
-        self.decoder = nn.Sequential()
-
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        
-        for index, activation_type in enumerate(activation_list):
-            if index < len(activation_list) // 2 + 1:
-                self.encoder.append(layer(layer_list[index], layer_list[index+1]))
-                self.encoder.append(activation_dict[activation_type]())
-            else:
-                self.decoder.append(layer(layer_list[index], layer_list[index+1]))
-                self.decoder.append(activation_dict[activation_type]())
-            
-        self.decoder.append(layer(layer_list[-2], layer_list[-1]))
-
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-
-    def forward(self, X, encoding=False, decoding=False) -> any:
-        """
-        # forward
-
-        forward(X, encoding=False, decoding=False)
-
-        Forward pass of the CNN autoencoder.
-
-        Parameters
-        ----------
-        - X : any
-            - Input signal of the autoencoder.
-        - encoding : bool
-            - If `True` the forward pass will return the encoder output.
-        - decoding : bool
-            - If `True` the forward pass expects an input X of size equal to 
-                the encoder output and returns the encoder output.
-
-        Returns
-        -------
-        - encoding = `True` (encoder) : Any
-            - Encoder output (size of the middle layer of the autoencoder)
-        - decoding = `True` (decoder) : Any
-            - Decoder output (size of the input layer of the autoencoder)
-        - encoding = decoding = `False` : Any
-            - Autoencoder output (size of the input layer of the autoencoder)
-        """
-        if encoding:
-            return self.encoder(X)
-        elif decoding:
-            return self.decoder(X)
-        else:
-            encode = self.encoder(X)
-            decode = self.decoder(encode)
-        return decode
-
-
-class autoencoder:
+class function:
 
     def __init__(self) -> None:
         pass
@@ -200,104 +87,6 @@ class autoencoder:
 
         return dictionary
     
-
-    def custom_Kfold(self, config):
-        """
-        # custom_Kfold
-
-        custom_Kfold(config)
-
-        Create a K-fold cross validation set up by creating a list of training, validation and test files.
-        The test files are meant to be used to test the model after the training and validation steps.
-        The test files stay the same accross the K folds. 
-        The training and validation are defined to create K folds and each fold can be separated into batches.
-
-        Parameters
-        ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary
-
-        Returns
-        -------
-        - train_files : list
-            - List of numpy arrays containing the name of the training files used in the batches and folds.
-              The list is organised so each element of the list is associated to a fold and the every sub array 
-              is a batch.
-        - validation_files : list
-            - List of numpy arrays containing the name of the validation files used in the batches and folds.
-              The list is organised so each element of the list is associated to a fold and the every sub array 
-              is a batch.
-        - test_files : list
-            - List containing all the test files.
-        - config : dict
-            - Updated dictionary. Define `input_dimension` of the autoencoder
-        """
-        folder = f"Datasets/{config['files']['dataset']}"
-        files = listdir(folder)
-
-        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42)
-        train_validation_files, test_files = train_test_split(files,train_size=config['train']['train_size'],shuffle=True)
-        splits = fold.split(train_validation_files)
-
-        train_files = []
-        validation_files = []
-
-        for train_index, validation_index in splits:
-            train_files.append(np.take(train_validation_files, train_index))
-            validation_files.append(np.take(train_validation_files, validation_index))
-
-        train_batch_number = validation_batch_number = config['train']['batch_number']
-        
-        batch_max = len(train_files[0])
-        if train_batch_number >= batch_max:
-            warnings.warn(f"Batch number too high, was set to {batch_max} (maximum)")
-            train_batch_number = batch_max
-        
-        batch_max = len(validation_files[0])
-        if validation_batch_number >= batch_max:
-            validation_batch_number = batch_max
-        
-        train_files = [np.array_split(train_fold, train_batch_number) for train_fold in train_files]
-        validation_files = [np.array_split(validation_fold, validation_batch_number) for validation_fold in validation_files]
-
-        return train_files, validation_files, test_files, config
-    
-
-    def custom_dataloader(self, config, files):
-        """
-        # custom_dataloader
-
-        custom_dataloader(config, files)
-
-        Creates a pytorch tensor containing all the batch samples of a specific fold.
-
-        Parameters
-        ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary
-        - files : list
-                - List of files used in the batch. 
-                  All the samples inside the files will be stored as a pytorch tensor.
-                  To reduce the memory requirements increase the batch number in the configuration dictionary.
-
-        Returns
-        -------
-        - samples : torch.tensor
-            - Three dimensional tensor containing the batch samples.
-              Tensor of shape (N,0,S), where N is the number of sample and S is the size of each sample.    
-        """
-        skip = config['network']["skip_elements"]
-        folder = f"Datasets/{config['files']['dataset']}"
-        size = config['files']['input_dimension']
-
-        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
-
-        if skip > 1: TES = TES[:, 1::skip]
-
-        return torch.from_numpy(TES).view(-1, 1, int(size / skip)).float()
-        
     
     def build_optimizer(self, network, config):
         """
@@ -353,6 +142,7 @@ class autoencoder:
         - optimizer : Pytorch optimizer
                 - Optimizer used to train the autoencoder.
         """
+
         criterion_dict = {
             "CrossEntropy"       : nn.CrossEntropyLoss(),
             "L1Loss"             : nn.L1Loss(),
@@ -361,7 +151,8 @@ class autoencoder:
             "HingeEmbeddingLoss" : nn.HingeEmbeddingLoss(),
             "MarginRankingLoss"  : nn.MarginRankingLoss(),
             "TripletMarginLoss"  : nn.TripletMarginLoss(),
-            "KLDivLoss"          : nn.KLDivLoss()
+            "KLDivLoss"          : nn.KLDivLoss(),
+            "custom"             : nn.MSELoss()
         }
 
         try:
@@ -402,22 +193,37 @@ class autoencoder:
         - Average loss : float
                 - Average loss of the training process (loss of one epoch).
         """
+        def custom_criterion(output, data, network, X_train):
+         
+            x = X_train.dataset.__getitem__(range(10_000))
+            x_numpy =x.numpy().reshape(-1,250)
+            feature = network(x, encoding=True).detach().numpy().reshape(-1,1)
+
+            labels = KMeans(n_clusters=21, random_state=42, n_init='auto').fit_predict(x_numpy)
+
+            davies_loss = davies_bouldin_score(feature, labels)
+            mse = nn.MSELoss()
+
+            return davies_loss / 1e4 + mse(output, data)
+
+
         cumu_loss = 0
         network.train()
-        for data in X_train:
-            # Use cuda if available
-            data = data.double().to(config['internal']['device'])
+        for _, data in tqdm(enumerate(X_train)):
             # Zero gradient
             optimizer.zero_grad()
             # Forward
-            loss = criterion(network(data), data)
+            output = network(data)
+            #loss = criterion(output, data)
+            loss = custom_criterion(output, data, network, X_train)
+
             # Backward
             loss.backward()
             optimizer.step()
             # Loss
             cumu_loss += loss.item()
 
-        return cumu_loss, len(X_train)
+        return cumu_loss / len(X_train)
     
 
     def validation_test(self, config, network, X, criterion, store=False):
@@ -461,27 +267,25 @@ class autoencoder:
         cumu_loss = 0
 
         if store:
-            results = {f'encode{i}': [] for i in range(config['network']['output_dimension'])}
-            results['input'] = []
-            results['decode'] = []
+            results = {'encode' : [],
+                       'input'  :  [],
+                       'decode' : []
+                       }
 
         network.eval()
         with torch.no_grad():
             for index, data in enumerate(X):
-                # Use cuda if available
-                data = data.double().to(config['internal']['device'])
 
                 if store:
                     encode = network(data, encoding=True)
                     decode = network(encode, decoding =True)
 
                     save_encode = torch.clone(encode).numpy()
-                    for dimension in range(config['network']['output_dimension']):
-                        results[f'encode{dimension}'].append(save_encode[0,dimension])
+                    results[f'encode'].append(save_encode[0,0,0])
 
                     if index < 2:
-                        results['input'].append(data.clone().numpy()[0])
-                        results['decode'].append(decode.clone().numpy()[0])
+                        results['input'].append(data.clone().view(-1).numpy())
+                        results['decode'].append(decode.clone().view(-1).numpy())
 
                 else:
                     decode = network(data)
@@ -492,7 +296,7 @@ class autoencoder:
         if store:
             return cumu_loss / len(X), results
         
-        return cumu_loss, len(X)
+        return cumu_loss / len(X)
     
 
     def save_all(self, log_path, network, results, loss, config):
@@ -503,7 +307,26 @@ class autoencoder:
         self.save_object(config, f"{log_path}/log")
 
 
-    def run(self, build_autoencoder, config):
+    def setup(self, config):
+
+        # log path and folder creation to store results
+        if config['sweep']['sweep_name'] is not None:
+            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
+        else:
+            config['internal'] = {}
+            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+
+        # Define device and runs on Cuda is available
+        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        # Define dataset
+        data = dataset.build_dataset(config)
+
+        return config, data, log_path
+
+
+    def run(self, config):
         """
         # run
 
@@ -525,61 +348,51 @@ class autoencoder:
         -------
         - None
         """
-        # log path and folder creation to store results
-        if config['sweep']['sweep_name'] is not None:
-            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
-        else:
-            config['internal'] = {}
-            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        config, data, log_path = self.setup(config)
 
-        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        fold = KFold(n_splits=config['train']['k-fold'], shuffle=True, random_state=42)
 
-        train_files, validation_files, test_files, config = self.custom_Kfold(config)
-
-        for fold_index in tqdm(range(config['train']['k-fold']), desc="Fold", total=config['train']['k-fold']):
+        for fold_index, (train_index, test_index) in tqdm(enumerate(fold.split(data)), 
+                                                        desc="Fold", 
+                                                        total=config['train']['k-fold']):
 
             # Initialization of loss and result arrays
             loss = {'train_loss'        : [], 
                     'validation_loss'   : [],
                     'test_loss'         : [],
-                    'average_test_loss' : []
                     }
-        
-            network = build_autoencoder(config).double().to(config['internal']['device'])
+    
+            network = autoencoder.build_autoencoder(config).float().to(config['internal']['device'])
             optimizer = self.build_optimizer(network, config)
             criterion = self.build_criterion(config)
 
-            for epoch in tqdm(range(config['train']['epochs']), desc="Epoch"):
+            train_sampler = SubsetRandomSampler(train_index)
+            test_sampler = SubsetRandomSampler(test_index)
+        
+            train_loader = DataLoader(data, batch_size=1, sampler=train_sampler)  #batch_size=config['train']['batch_number']
+            test_loader = DataLoader(data, batch_size=1, sampler=test_sampler)
+
+            for epoch in tqdm(range(config['train']['epochs']) , desc="Epoch"):
                 
-                train_loss = validation_loss = train_number = validation_number = 0
+                train_loss = self.train_epoch(config, network, train_loader, optimizer, criterion)
+                validation_loss = self.validation_test(config, network, test_loader, criterion)
 
-                for batch_files in train_files[fold_index]:   
-                
-                    X_train = self.custom_dataloader(config, batch_files)
-                    
-                    train_loss_, train_number_ = self.train_epoch(config, network, X_train, optimizer, criterion)
-                    train_loss += train_loss_
-                    train_number += train_number_
+                loss['train_loss'].append(train_loss)
+                loss['validation_loss'].append(validation_loss)
 
-                for batch_files in validation_files[fold_index]:
-
-                    X_validation = self.custom_dataloader(config, batch_files)
-
-                    validation_loss_, validation_number_ = self.validation_test(config, network, X_validation, criterion)
-                    validation_loss += validation_loss_
-                    validation_number += validation_number_
-
-                loss['train_loss'].append(train_loss/train_number)
-                loss['validation_loss'].append(validation_loss/validation_number)
-            
-            X_test = self.custom_dataloader(config, test_files)
-            test_loss , results = self.validation_test(config, network, X_test, criterion, store=True)
+            # Temporary test (test should be different from validation to be unbias)
+            test_loss, results = self.validation_test(config, network, test_loader, criterion, store=True)
             loss['test_loss'].append(test_loss)
-    
+            
             fold_path = f"{log_path}/fold {fold_index}"
             makedirs(fold_path)
+
             self.save_all(fold_path, network, results, loss, config)
+
+            #if config['train']['cluster']:
+
+             #   for 
+
 
 
 
@@ -647,7 +460,7 @@ class autoencoder:
                         config_run['sweep'][parameter] = choice(config[parameter])
                     
                 # Train the newly created config
-                self.run(build_autoencoder, config_run)
+                self.run(config_run)
                 config_run['internal']['sweep_index'] += 1
                 pbar.update(1)
             pbar.close()
@@ -668,13 +481,39 @@ class autoencoder:
                     config_run['train'][value] = parameters[value]
                 
                 # Train the newly created config
-                self.run(build_autoencoder, config_run)
+                self.run(config_run)
                 config_run['internal']['sweep_index'] += 1
                 pbar.update(1)
             pbar.close()
         
 
-    def load_results(self, file_name):
+    def silhouette_kmean(self, X, max_cluster):
+
+        X = np.array(X).reshape(-1,1)
+        scores1 = []
+        scores2 = []
+        scores3 = []
+
+        for cluster_number in tqdm(range(2,max_cluster+1) , desc="Clusters") :
+            clusters = KMeans(n_clusters=cluster_number, random_state=42).fit_predict(X[::3])
+            #scores1.append(silhouette_score(X[::10], clusters))
+            #scores2.append(calinski_harabasz_score(X[::10], clusters))
+            scores3.append(davies_bouldin_score(X[::3], clusters))
+
+        optimal_cluster = np.argmin(scores3) + 1
+
+        labels = KMeans(n_clusters=optimal_cluster, random_state=42).fit(X).labels_
+        optimal_score = silhouette_score(X, labels)
+
+        out = []
+        for label in np.unique(labels):
+            out.append(X[labels == label])
+
+        return scores1, scores2, scores3, out, optimal_cluster, optimal_score
+
+
+
+    def load_run_results(self, file_name):
         """
         # load_results
 
@@ -692,36 +531,37 @@ class autoencoder:
         -------
         - None
         """
+
         warnings.filterwarnings("ignore")
         path = f"Autoencoder Log/{file_name}"
         
-
         for index, fold in enumerate(listdir(path)):
 
             fig, axs = plt.subplots(2,2,figsize=(15,8))
 
             results = self.open_object(f"{path}/{fold}/results.bin")
-            
-            if "encode1" in results: 
-                axs[0,0].scatter(results['encode0'], results['encode1'],label=f"fold {index}",s=5,alpha=0.01)
-                axs[0,0].set_xlabel("feature 1")
-                axs[0,0].set_ylabel("feature 2")
-                #axs[0,0].set_yscale("log")
-                leg = axs[0,0].legend()
-                for lh in leg.legendHandles: 
-                    lh.set_alpha(1)
-            else:
-                axs[0,0].hist(results['encode0'],bins=4500)
-                axs[0,0].set_xlabel("feature 1")
-                axs[0,0].set_ylabel("counts")
 
+            scores1, scores2, scores3, X, optimal_cluster, optimal_score = self.silhouette_kmean(results['encode'], 40)
+            print(f"Optimal number : {optimal_cluster}")
+            
+            bins = np.linspace(min(results['encode']), max(results['encode']), 1000)
+
+            for index, cluster in enumerate(X):
+                axs[0,0].hist(cluster , bins, alpha = 0.5)
+            #axs[0,0].hist(results['encode'] , bins)
+            axs[0,0].set_xlabel("feature")
+            axs[0,0].set_ylabel("counts")
                 
 
-            axs[1,0].plot(results['decode'][0],label=f"Autoencoder output {index}")
-            axs[1,0].plot(results['input'][0],label=f"Autoencoder input {index}")
-            axs[1,0].set_ylabel("Normalized voltage")
-            axs[1,0].set_xlabel("element")
+            #axs[1,0].plot(range(2, len(scores1)+2), scores1, label="Silhouette")
+            #axs[1,0].plot(range(2, len(scores2)+2), scores2, label="Calinski-Harabasz")
+            axs[1,0].plot(range(2, len(scores3)+2), scores3, label="Davies-Bouldin")
+
+            axs[1,0].hlines(optimal_score, 2, len(scores1)+2, label="Final Silhouette")
+            axs[1,0].set_ylabel("Silhouette score")
+            axs[1,0].set_xlabel("Number of cluster")
             axs[1,0].legend()
+
 
             axs[1,1].plot(results['decode'][1],label=f"Autoencoder output {index}")
             axs[1,1].plot(results['input'][1],label=f"Autoencoder input {index}")
