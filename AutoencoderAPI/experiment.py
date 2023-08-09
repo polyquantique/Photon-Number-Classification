@@ -3,30 +3,33 @@ from os import listdir, makedirs
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from datetime import datetime
-from  random import choices, choice
+from random import choices, choice, sample
 
 import torch
 import torch.onnx
 from torch import nn
 import torch.optim as optim
 
-from sklearn.model_selection import KFold, ParameterGrid
+from sklearn.model_selection import KFold, train_test_split, ParameterGrid
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
-
-from kmeans_pytorch import kmeans
+from sklearn.metrics import silhouette_score
 
 from tqdm.notebook import tqdm
 import pickle
 import warnings
-from torch.utils.data import SubsetRandomSampler, DataLoader, Subset
 
-from AutoencoderAPI import dataset, autoencoder #, transformer
+from AutoencoderAPI import dataset, autoencoder 
+from AutoencoderAPI.utils.files import open_object, save_object
+from AutoencoderAPI.loss.pytorch_kmeans_silhouette_loss import pytorch_kmeans_silhouette_loss
+from AutoencoderAPI.loss.sklearn_kernelDensity_loss import sklearn_kernelDensity_loss
+from AutoencoderAPI.loss.sklearn_kmeans_silhouette_loss import sklearn_kmeans_silhouette_loss
 
 plt.style.use("seaborn-pastel")
 
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)
+
+
 
 class function:
 
@@ -34,59 +37,103 @@ class function:
         pass
 
 
-    def save_object(self, save_object, file_name) -> None:
+    def custom_Kfold(self, config):
         """
-        # save_object
+        # custom_Kfold
 
-        save_object(save_object, file_name)
+        custom_Kfold(config)
 
-        Save an object to a .bin file using the Pickle library.
-        Is used in this context for dictionaries.
+        Create a K-fold cross validation set up by creating a list of training, validation and test files.
+        The test files are meant to be used to test the model after the training and validation steps.
+        The test files stay the same accross the K folds. 
+        The training and validation are defined to create K folds and each fold can be separated into batches.
 
         Parameters
         ----------
-        - save_object : dict
-                - Dictionary to save.
-        - file_name : str
-                - Name of the file to save.
+        - config : dict
+                - Dictionary containing the experiment parameters. 
+                  See the `autoencoder` class for more details on the config dictionary
 
         Returns
         -------
-        None
+        - train_files : list
+            - List of numpy arrays containing the name of the training files used in the batches and folds.
+              The list is organised so each element of the list is associated to a fold and the every sub array 
+              is a batch.
+        - validation_files : list
+            - List of numpy arrays containing the name of the validation files used in the batches and folds.
+              The list is organised so each element of the list is associated to a fold and the every sub array 
+              is a batch.
+        - test_files : list
+            - List containing all the test files.
+        - config : dict
+            - Updated dictionary. Define `input_dimension` of the autoencoder
         """
-        try:
-            with open(f"{file_name}.bin", 'wb') as f:
-                pickle.dump(save_object, f)
-        except Exception as ex:
-            warnings.warn("Error during saving process : ", ex)
+        folder = f"{config['files']['dataset']}"
+        files = listdir(folder)
 
+        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42)
+        train_validation_files, test_files = train_test_split(files,train_size=0.8,shuffle=True)
+        splits = fold.split(train_validation_files)
 
-    def open_object(self, file_name):
-        """
-        # open_object
+        train_files = []
+        validation_files = []
 
-        open_object(file_name)
+        for train_index, validation_index in splits:
+            train_files.append(np.take(train_validation_files, train_index))
+            validation_files.append(np.take(train_validation_files, validation_index))
 
-        Open a file using the Pickle library. 
-        Is used in this context for files containing dictionaries.
+        train_batch_number = validation_batch_number = config['train']['batch_number']
+        
+        batch_max = len(train_files[0])
+        if train_batch_number >= batch_max:
+            warnings.warn(f"Batch number too high, was set to {batch_max} (maximum)")
+            train_batch_number = batch_max
+        
+        batch_max = len(validation_files[0])
+        if validation_batch_number >= batch_max:
+            validation_batch_number = batch_max
+        
+        train_files = [np.array_split(train_fold, train_batch_number) for train_fold in train_files]
+        validation_files = [np.array_split(validation_fold, validation_batch_number) for validation_fold in validation_files]
 
-        Parameters
-        ----------
-        - file_name : str
-                - Name of the file to open.
-
-        Returns
-        -------
-        None
-        """
-        try:
-            with open(file_name, 'rb') as f:
-                dictionary = pickle.load(f)
-        except Exception as ex:
-            warnings.warn("Error when loading file : ", ex)
-
-        return dictionary
+        return train_files, validation_files, test_files, config
     
+
+    def custom_dataloader(self, config, files):
+        """
+        # custom_dataloader
+
+        custom_dataloader(config, files)
+
+        Creates a pytorch tensor containing all the batch samples of a specific fold.
+
+        Parameters
+        ----------
+        - config : dict
+                - Dictionary containing the experiment parameters. 
+                  See the `autoencoder` class for more details on the config dictionary
+        - files : list
+                - List of files used in the batch. 
+                  All the samples inside the files will be stored as a pytorch tensor.
+                  To reduce the memory requirements increase the batch number in the configuration dictionary.
+
+        Returns
+        -------
+        - samples : torch.tensor
+            - Three dimensional tensor containing the batch samples.
+              Tensor of shape (N,0,S), where N is the number of sample and S is the size of each sample.    
+        """
+        skip = config['network']["skip_elements"]
+        folder = f"{config['files']['dataset']}"
+        size = config['files']['input_dimension']
+
+        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
+
+        if skip > 1: TES = TES[:, 1::skip]
+
+        return torch.from_numpy(TES).view(-1, 1, int(size / skip)).float()
+        
     
     def build_optimizer(self, network, config):
         """
@@ -144,15 +191,17 @@ class function:
         """
 
         criterion_dict = {
-            "CrossEntropy"       : nn.CrossEntropyLoss(),
-            "L1Loss"             : nn.L1Loss(),
-            "MSELoss"            : nn.MSELoss(),
-            "NLLLoss"            : nn.NLLLoss(),
-            "HingeEmbeddingLoss" : nn.HingeEmbeddingLoss(),
-            "MarginRankingLoss"  : nn.MarginRankingLoss(),
-            "TripletMarginLoss"  : nn.TripletMarginLoss(),
-            "KLDivLoss"          : nn.KLDivLoss(),
-            "custom"             : nn.MSELoss()
+            "CrossEntropy"       : (nn.CrossEntropyLoss() , 0),
+            "L1Loss"             : (nn.L1Loss() , 0),
+            "MSELoss"            : (nn.MSELoss() , 0),
+            "NLLLoss"            : (nn.NLLLoss() , 0),
+            "HingeEmbeddingLoss" : (nn.HingeEmbeddingLoss() , 0),
+            "MarginRankingLoss"  : (nn.MarginRankingLoss() , 0),
+            "TripletMarginLoss"  : (nn.TripletMarginLoss() , 0),
+            "KLDivLoss"          : (nn.KLDivLoss() , 0),
+            "pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , 1),
+            "sklearn_kernelDensity_loss"      : (sklearn_kernelDensity_loss() , 1),
+            "sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , 1)
         }
 
         try:
@@ -193,29 +242,24 @@ class function:
         - Average loss : float
                 - Average loss of the training process (loss of one epoch).
         """
-        def custom_criterion(output, data, network, X_train):
-         
-            x = X_train.dataset.__getitem__(range(10_000))
-            x_numpy =x.numpy().reshape(-1,250)
-            feature = network(x, encoding=True).detach().numpy().reshape(-1,1)
-
-            labels = KMeans(n_clusters=21, random_state=42, n_init='auto').fit_predict(x_numpy)
-
-            davies_loss = davies_bouldin_score(feature, labels)
-            mse = nn.MSELoss()
-
-            return davies_loss / 1e4 + mse(output, data)
-
-
         cumu_loss = 0
         network.train()
-        for _, data in tqdm(enumerate(X_train)):
+        list_ = range(len(X_train))
+        for _, data in tqdm(enumerate(X_train) , total=len(X_train)): #enumerate(X_train):
+            # Use cuda if available
+            data = data.float().to(config['internal']['device'])
             # Zero gradient
             optimizer.zero_grad()
             # Forward
             output = network(data)
-            #loss = criterion(output, data)
-            loss = custom_criterion(output, data, network, X_train)
+            # Criterion
+            if criterion[1]:
+                if _//40 == 0:
+                    X_sub = X_train[sample(list_, 10_000)]
+                crit = criterion[0]
+                loss = crit.forward(output, data, network, X_sub)
+            else:
+                loss = criterion[0](output, data)
 
             # Backward
             loss.backward()
@@ -223,7 +267,7 @@ class function:
             # Loss
             cumu_loss += loss.item()
 
-        return cumu_loss / len(X_train)
+        return cumu_loss, len(X_train)
     
 
     def validation_test(self, config, network, X, criterion, store=False):
@@ -268,24 +312,26 @@ class function:
 
         if store:
             results = {'encode' : [],
-                       'input'  :  [],
+                       'input'  : [],
                        'decode' : []
-                       }
+            }
 
         network.eval()
         with torch.no_grad():
             for index, data in enumerate(X):
+                # Use cuda if available
+                data = data.float().to(config['internal']['device'])
 
                 if store:
                     encode = network(data, encoding=True)
                     decode = network(encode, decoding =True)
 
                     save_encode = torch.clone(encode).numpy()
-                    results[f'encode'].append(save_encode[0,0,0])
+                    results['encode'].append(save_encode[0])
 
                     if index < 2:
-                        results['input'].append(data.clone().view(-1).numpy())
-                        results['decode'].append(decode.clone().view(-1).numpy())
+                        results['input'].append(data.clone().numpy()[0])
+                        results['decode'].append(decode.clone().numpy()[0])
 
                 else:
                     decode = network(data)
@@ -296,34 +342,15 @@ class function:
         if store:
             return cumu_loss / len(X), results
         
-        return cumu_loss / len(X)
+        return cumu_loss, len(X)
     
 
     def save_all(self, log_path, network, results, loss, config):
         torch.save(network.state_dict() , f"{log_path}/model.pt")
 
-        self.save_object(results , f"{log_path}/results")
-        self.save_object(loss , f"{log_path}/loss")
-        self.save_object(config, f"{log_path}/log")
-
-
-    def setup(self, config):
-
-        # log path and folder creation to store results
-        if config['sweep']['sweep_name'] is not None:
-            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
-        else:
-            config['internal'] = {}
-            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-            log_path = f"{config['files']['path_save']}/run-{folder_name}"
-
-        # Define device and runs on Cuda is available
-        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-        # Define dataset
-        data = dataset.build_dataset(config)
-
-        return config, data, log_path
+        save_object(results , f"{log_path}/results")
+        save_object(loss , f"{log_path}/loss")
+        save_object(config, f"{log_path}/log")
 
 
     def run(self, config):
@@ -348,51 +375,61 @@ class function:
         -------
         - None
         """
-        config, data, log_path = self.setup(config)
+        # log path and folder creation to store results
+        if config['sweep']['sweep_name'] is not None:
+            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
+        else:
+            config['internal'] = {}
+            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}/run-{folder_name}"
 
-        fold = KFold(n_splits=config['train']['k-fold'], shuffle=True, random_state=42)
+        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        for fold_index, (train_index, test_index) in tqdm(enumerate(fold.split(data)), 
-                                                        desc="Fold", 
-                                                        total=config['train']['k-fold']):
+        train_files, validation_files, test_files, config = self.custom_Kfold(config)
+
+        for fold_index in tqdm(range(config['train']['k-fold']), desc="Fold", total=config['train']['k-fold']):
 
             # Initialization of loss and result arrays
-            loss = {'train_loss'        : [], 
+            loss = {'train_loss'        : [],
                     'validation_loss'   : [],
                     'test_loss'         : [],
+                    'average_test_loss' : []
                     }
-    
+        
             network = autoencoder.build_autoencoder(config).float().to(config['internal']['device'])
             optimizer = self.build_optimizer(network, config)
             criterion = self.build_criterion(config)
 
-            train_sampler = SubsetRandomSampler(train_index)
-            test_sampler = SubsetRandomSampler(test_index)
-        
-            train_loader = DataLoader(data, batch_size=1, sampler=train_sampler)  #batch_size=config['train']['batch_number']
-            test_loader = DataLoader(data, batch_size=1, sampler=test_sampler)
-
-            for epoch in tqdm(range(config['train']['epochs']) , desc="Epoch"):
+            for epoch in tqdm(range(config['train']['epochs']), desc="Epoch"):
                 
-                train_loss = self.train_epoch(config, network, train_loader, optimizer, criterion)
-                validation_loss = self.validation_test(config, network, test_loader, criterion)
+                train_loss = validation_loss = train_number = validation_number = 0
 
-                loss['train_loss'].append(train_loss)
-                loss['validation_loss'].append(validation_loss)
+                for batch_files in tqdm(train_files[fold_index], desc="Train batch"):   
+                
+                    X_train = self.custom_dataloader(config, batch_files)
+                    
+                    train_loss_, train_number_ = self.train_epoch(config, network, X_train, optimizer, criterion)
+                    train_loss += train_loss_
+                    train_number += train_number_
 
-            # Temporary test (test should be different from validation to be unbias)
-            test_loss, results = self.validation_test(config, network, test_loader, criterion, store=True)
-            loss['test_loss'].append(test_loss)
+                for batch_files in tqdm(validation_files[fold_index], desc="Validation batch"):
+
+                    X_validation = self.custom_dataloader(config, batch_files)
+
+                    validation_loss_, validation_number_ = self.validation_test(config, network, X_validation, criterion)
+                    validation_loss += validation_loss_
+                    validation_number += validation_number_
+
+                loss['train_loss'].append(train_loss/train_number)
+                loss['validation_loss'].append(validation_loss/validation_number)
             
+            X_test = self.custom_dataloader(config, test_files)
+            test_loss , results = self.validation_test(config, network, X_test, criterion, store=True)
+            loss['test_loss'].append(test_loss)
+    
             fold_path = f"{log_path}/fold {fold_index}"
             makedirs(fold_path)
-
             self.save_all(fold_path, network, results, loss, config)
-
-            #if config['train']['cluster']:
-
-             #   for 
-
 
 
 
@@ -460,7 +497,7 @@ class function:
                         config_run['sweep'][parameter] = choice(config[parameter])
                     
                 # Train the newly created config
-                self.run(config_run)
+                self.run(build_autoencoder, config_run)
                 config_run['internal']['sweep_index'] += 1
                 pbar.update(1)
             pbar.close()
@@ -481,37 +518,47 @@ class function:
                     config_run['train'][value] = parameters[value]
                 
                 # Train the newly created config
-                self.run(config_run)
+                self.run(build_autoencoder, config_run)
                 config_run['internal']['sweep_index'] += 1
                 pbar.update(1)
             pbar.close()
-        
+
 
     def silhouette_kmean(self, X, max_cluster):
 
         X = np.array(X).reshape(-1,1)
         scores1 = []
-        scores2 = []
-        scores3 = []
+        #scores2 = []
+        #scores3 = []
 
         for cluster_number in tqdm(range(2,max_cluster+1) , desc="Clusters") :
-            clusters = KMeans(n_clusters=cluster_number, random_state=42).fit_predict(X[::3])
-            #scores1.append(silhouette_score(X[::10], clusters))
+            clusters = KMeans(n_clusters=cluster_number, random_state=42, algorithm='auto').fit_predict(X[::10])
+            scores1.append(silhouette_score(X[::10], clusters))
             #scores2.append(calinski_harabasz_score(X[::10], clusters))
-            scores3.append(davies_bouldin_score(X[::3], clusters))
+            #scores3.append(davies_bouldin_score(X[::3], clusters))
 
-        optimal_cluster = np.argmin(scores3) + 1
+        optimal_cluster = np.argmax(scores1) + 1
 
-        labels = KMeans(n_clusters=optimal_cluster, random_state=42).fit(X).labels_
-        optimal_score = silhouette_score(X, labels)
+        km = KMeans(n_clusters=optimal_cluster, random_state=42)
+        fit = km.fit(X)
+        
+        centroids = fit.cluster_centers_
+        labels = fit.labels_
+        unique_label = np.unique(labels)
+
+        if len(unique_label) > 1:
+            optimal_score = silhouette_score(X, labels)
+        else:
+            optimal_score = 0
 
         out = []
-        for label in np.unique(labels):
+        for label in unique_label:
             out.append(X[labels == label])
 
-        return scores1, scores2, scores3, out, optimal_cluster, optimal_score
+        centroids, out, labels = zip(*sorted(zip(centroids, out, unique_label)))
 
-
+        return scores1, optimal_cluster, optimal_score, out, np.mean(labels)
+        
 
     def load_run_results(self, file_name):
         """
@@ -537,30 +584,33 @@ class function:
         
         for index, fold in enumerate(listdir(path)):
 
-            fig, axs = plt.subplots(2,2,figsize=(15,8))
+            fig, axs = plt.subplots(2,2,figsize=(15,10))
 
-            results = self.open_object(f"{path}/{fold}/results.bin")
+            results = open_object(f"{path}/{fold}/results.bin")
 
-            scores1, scores2, scores3, X, optimal_cluster, optimal_score = self.silhouette_kmean(results['encode'], 40)
+            scores1, optimal_cluster, optimal_score, out, average_nb = self.silhouette_kmean(results['encode'], 40)
             print(f"Optimal number : {optimal_cluster}")
             
-            bins = np.linspace(min(results['encode']), max(results['encode']), 1000)
+            bins = np.linspace(min(results['encode']), max(results['encode']), 2000).reshape(-1)
 
-            for index, cluster in enumerate(X):
-                axs[0,0].hist(cluster , bins, alpha = 0.5)
+            for index1, cluster in enumerate(out):
+                axs[0,0].hist(cluster , bins, alpha = 0.5, label=f"{index1}")
             #axs[0,0].hist(results['encode'] , bins)
             axs[0,0].set_xlabel("feature")
             axs[0,0].set_ylabel("counts")
+            axs[0,0].legend(ncol=3)
+            axs[0,0].title.set_text(f"Average photon number : {average_nb}")
                 
 
             #axs[1,0].plot(range(2, len(scores1)+2), scores1, label="Silhouette")
             #axs[1,0].plot(range(2, len(scores2)+2), scores2, label="Calinski-Harabasz")
-            axs[1,0].plot(range(2, len(scores3)+2), scores3, label="Davies-Bouldin")
+            axs[1,0].plot(range(2, len(scores1)+2), scores1, label="Approx Silhouette")
 
-            axs[1,0].hlines(optimal_score, 2, len(scores1)+2, label="Final Silhouette")
-            axs[1,0].set_ylabel("Silhouette score")
+            axs[1,0].hlines(optimal_score, 2, len(scores1)+2, linestyles='dashed', label="Final Silhouette")
+            axs[1,0].set_ylabel("Clustering score")
             axs[1,0].set_xlabel("Number of cluster")
             axs[1,0].legend()
+            axs[1,0].title.set_text("3")
 
 
             axs[1,1].plot(results['decode'][1],label=f"Autoencoder output {index}")
@@ -568,8 +618,9 @@ class function:
             axs[1,1].set_ylabel("Normalized voltage")
             axs[1,1].set_xlabel("element")
             axs[1,1].legend()
+            axs[1,1].title.set_text("4")
 
-            loss = self.open_object(f"{path}/{fold}/loss.bin")
+            loss = open_object(f"{path}/{fold}/loss.bin")
 
             axs[0,1].plot(loss['train_loss'],label=f"Train {index}")
             axs[0,1].plot(loss['validation_loss'],label=f"Validation {index}")
@@ -577,10 +628,12 @@ class function:
             axs[0,1].legend()
             axs[0,1].set_ylabel("loss")
             axs[0,1].set_xlabel("epoch")
+            axs[0,1].title.set_text("2")
 
-        config_file = self.open_object(f"{path}/{fold}/log.bin")
+        config_file = open_object(f"{path}/{fold}/log.bin")
         print("Activation list : ", config_file['run']['activation_list'])
         print("Layer list : ", config_file['run']['layer_list'])
+
 
 
     def load_sweep_results(self, file_name, parameters):
@@ -598,10 +651,10 @@ class function:
             fold_len = len(fold_list)
 
             for index, fold in enumerate(fold_list):
-                loss = self.open_object(f"{path}/{sweep}/{fold}/loss.bin")
+                loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
                 loss_cum += loss['test_loss'][0]
 
-            config_file = self.open_object(f"{path}/{sweep}/{fold}/log.bin")
+            config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
             
             parameter1.append(config_file['train'][parameters[0]])
             parameter2.append(config_file['train'][parameters[1]])

@@ -22,6 +22,7 @@ class build_dataset(Dataset):
         if skip > 1: X = X[:, 1::skip]
 
         self.data = torch.from_numpy(X).view(-1, 1, int(size / skip)).float().to(config['internal']['device'])
+        print(len(X))
         self.keys = config.keys()
 
         if 'transformer' in config.keys():
