@@ -23,7 +23,7 @@ A qualitative exploration of dimensionality reduction techniques for single phot
 Neural network trained to reproduce the signal it receives as input. Half the network (encoder) can be used to asign an arbitrary number of parameters to an input signal. This way, the encoder acts as a dimensionality reduction process.
 
 <p align="center">
-    <img src="Assets/BowTie to HalfTie.png"/>
+    <img src="Assets README/BowTie to HalfTie.png"/>
 </p>
 
 ## TODO

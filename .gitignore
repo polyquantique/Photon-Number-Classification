@@ -2,3 +2,7 @@
 /Autoencoder Log/*
 /Datasets/*
 /__pycache__/*
+/GIFmaker/*
+/Autoencoder Log/__pycache__/*
+/Autoencoder Log/loss/__pycache__/*
+/Autoencoder Log/utils/__pycache__/*
