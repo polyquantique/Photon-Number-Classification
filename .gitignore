@@ -3,6 +3,6 @@
 /Datasets/*
 /__pycache__
 /GIFmaker/*
-/Autoencoder Log/__pycache__
-/Autoencoder Log/loss/__pycache__
-/Autoencoder Log/utils/__pycache__
+/AutoencoderAPI/__pycache__
+/AutoencoderAPI/loss/__pycache__
+/AutoencoderAPI/utils/__pycache__
