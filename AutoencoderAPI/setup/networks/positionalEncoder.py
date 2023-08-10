@@ -1,4 +1,5 @@
-
+from torch import nn
+import torch
 
 
 class PositionalEncoder(nn.Module):
@@ -46,7 +47,7 @@ class PositionalEncoder(nn.Module):
         
         self.register_buffer('pe', pe)
         
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         """
         Args:
             x: Tensor, shape [batch_size, enc_seq_len, dim_val] or 

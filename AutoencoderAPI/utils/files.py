@@ -1,4 +1,7 @@
+#General import
 import pickle
+
+#Class specific import
 
 def open_object(file_name):
     """
@@ -26,7 +29,9 @@ def open_object(file_name):
     return object_
 
 
-def save_object(save_object, file_name) -> None:
+#Class specific import
+
+def save_object(save_object, file_name):
         """
         # save_object
 
@@ -53,4 +58,15 @@ def save_object(save_object, file_name) -> None:
             warnings.warn("Error during saving process : ", ex)
 
 
-    
+#Class specific import
+import torch
+
+def save_all(log_path, network, results, loss, config):
+    torch.save(network.state_dict() , f"{log_path}/model.pt")
+    save_object(results , f"{log_path}/results")
+    save_object(loss , f"{log_path}/loss")
+    save_object(config, f"{log_path}/log")
+
+
+
+

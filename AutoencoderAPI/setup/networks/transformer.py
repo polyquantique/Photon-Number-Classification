@@ -1,4 +1,4 @@
-import positionalEncoder
+from .positionalEncoder import PositionalEncoder
 import torch.nn as nn 
 from torch import nn, Tensor
 import torch.nn.functional as F
@@ -41,6 +41,7 @@ class TimeSeriesTransformer(nn.Module):
         """
         super().__init__() 
 
+        """
         input_size: int,
         dec_seq_len: int,
         batch_first: bool,
@@ -55,6 +56,7 @@ class TimeSeriesTransformer(nn.Module):
         dim_feedforward_encoder: int=2048,
         dim_feedforward_decoder: int=2048,
         num_predicted_features: int=1
+        """
 
         self.dec_seq_len = dec_seq_len
         self.encoder_input_layer = nn.Linear(in_features=input_size, out_features=dim_val)
@@ -86,7 +88,7 @@ class TimeSeriesTransformer(nn.Module):
                                             norm=None
                                             )
 
-    def forward(self, sequence: Tensor, encoding: bool=False) -> Tensor:
+    def forward(self, sequence: Tensor, encoding: bool=False):
         """
         Returns a tensor of shape:
         [target_sequence_length, batch_size, num_predicted_features]
@@ -134,25 +136,25 @@ class TimeSeriesTransformer(nn.Module):
                                     )
         decoder_output = self.linear_mapping(decoder_output)
 
-        if encoding
+        if encoding:
             return src
         return decoder_output, trg_y
 
 
-    def generate_square_subsequent_mask(dim1: int, dim2: int) -> Tensor:
-    """
-    Generates an upper-triangular matrix of -inf, with zeros on diag.
-    Source:
-    https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-    Args:
-        dim1: int, for both src and tgt masking, this must be target sequence
-              length
-        dim2: int, for src masking this must be encoder sequence length (i.e. 
-              the length of the input sequence to the model), 
-              and for tgt masking, this must be target sequence length 
-    Return:
-        A Tensor of shape [dim1, dim2]
-    """
+    def generate_square_subsequent_mask(dim1: int, dim2: int):
+        """
+        Generates an upper-triangular matrix of -inf, with zeros on diag.
+        Source:
+        https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+        Args:
+            dim1: int, for both src and tgt masking, this must be target sequence
+                length
+            dim2: int, for src masking this must be encoder sequence length (i.e. 
+                the length of the input sequence to the model), 
+                and for tgt masking, this must be target sequence length 
+        Return:
+            A Tensor of shape [dim1, dim2]
+        """
         return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
 
 
@@ -161,7 +163,7 @@ class TimeSeriesTransformer(nn.Module):
         sequence: torch.Tensor, 
         encoder_seq_len: int, 
         target_seq_len: int
-        ) -> Tuple[torch.tensor, torch.tensor, torch.tensor]:
+        ):
 
         """
         Generate the src (encoder input), trg (decoder input) and trg_y (the target)
