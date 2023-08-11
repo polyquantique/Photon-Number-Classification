@@ -12,6 +12,7 @@ import warnings
 from .setup.networks.autoencoder import build_autoencoder 
 from .setup.optimizer import build_optimizer
 from .setup.criterion import build_criterion
+from .utils.files import save_all
 
 
 torch.use_deterministic_algorithms(True)
@@ -333,7 +334,7 @@ class function:
     
             fold_path = f"{log_path}/fold {fold_index}"
             makedirs(fold_path)
-            self.save_all(fold_path, network, results, loss, config)
+            save_all(fold_path, network, results, loss, config)
 
 
 

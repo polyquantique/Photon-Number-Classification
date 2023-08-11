@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+from os import listdir
 from .files import open_object
 plt.style.use('seaborn-pastel')
 
@@ -46,7 +48,7 @@ def load_run_results(file_name):
         scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], 40)
         print(f"Optimal number of clusters : {optimal_cluster}")
         
-        bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).reshape(-1)
+        bins = np.linspace(min(results['encode']), max(results['encode']), 1_000).reshape(-1)
 
         for index_cluster, cluster in enumerate(clusters):
             axs[0,0].hist(cluster , bins, alpha = 0.5, label=f"{index_cluster}")
@@ -55,7 +57,7 @@ def load_run_results(file_name):
         axs[0,0].legend(ncol=3)
             
         axs[1,0].plot(range(2, len(scores)+2), scores, label="Approx Silhouette")
-        axs[1,0].hlines(optimal_score, 2, len(scores1)+2, linestyles='dashed', label="Final Silhouette")
+        axs[1,0].hlines(optimal_score, 2, len(scores)+2, linestyles='dashed', label="Final Silhouette")
         axs[1,0].set_ylabel("Clustering score")
         axs[1,0].set_xlabel("Number of cluster")
         axs[1,0].legend()
