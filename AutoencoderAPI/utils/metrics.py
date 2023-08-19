@@ -6,14 +6,17 @@ from tqdm.notebook import tqdm
 
 def silhouette_kmean(feature, max_cluster):
 
-    feature = np.array(feature).reshape(-1,1)
+    feature = np.array(feature).reshape(-1,1)[::10]
     scores = []
 
-    for cluster_number in tqdm(range(4,max_cluster+1) , desc="Clusters") :
-        predict = KMeans(n_clusters=cluster_number, random_state=42, algorithm='lloyd', n_init='auto').fit_predict(feature[::10])
-        scores.append(silhouette_score(feature[::10], predict))
+    for cluster_number in tqdm(range(3,max_cluster+1) , desc="Clusters") :
+        predict = KMeans(n_clusters=cluster_number, random_state=42, algorithm='lloyd', n_init='auto').fit_predict(feature)
+        if len(np.unique(predict)) != 1:
+            scores.append(silhouette_score(feature, predict))
+        else:
+            scores.append(0)
 
-    optimal_cluster = np.argmax(scores) + 4
+    optimal_cluster = np.argmax(scores) + 3
 
     km = KMeans(n_clusters=optimal_cluster, random_state=42)
     fit = km.fit(feature)

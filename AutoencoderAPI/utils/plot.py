@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from os import listdir
 from .files import open_object
+from matplotlib import colors
+import warnings
+warnings.filterwarnings("ignore")
 plt.style.use('seaborn-pastel')
 
 # Class specific import
@@ -78,8 +81,9 @@ def load_run_results(file_name):
         axs[0,1].set_xlabel("epoch")
 
     config_file = open_object(f"{path}/{fold}/log.bin")
-    print("Activation list : ", config_file['run']['activation_list'])
-    print("Layer list : ", config_file['run']['layer_list'])
+    print("Activation list : ", config_file['network']['activation_list'])
+    print("Layer list : ", config_file['network']['layer_list'])
+    print("Optimal Silhouette score : ", optimal_score)
 
 
 # Class specific import
@@ -100,15 +104,13 @@ def load_sweep_results(file_name, parameters : tuple):
     -------
     - None
 
-    TODO 
-    Compatibility with new file structure.
     """
     path = f"Autoencoder Log/{file_name}"
 
     parameter1 = []
     parameter2 = []
     loss_sweep = []
-    min_loss = 1
+    min_loss = 0#1
     
     for sweep in sorted(listdir(path)):
         loss_cum = 0
@@ -117,7 +119,7 @@ def load_sweep_results(file_name, parameters : tuple):
 
         for index, fold in enumerate(fold_list):
             loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
-            loss_cum += loss['test_loss'][0]
+            loss_cum += loss['Silhouette']#['test_loss'][0]
 
         config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
         
@@ -125,7 +127,7 @@ def load_sweep_results(file_name, parameters : tuple):
         parameter2.append(config_file['train'][parameters[1]])
         loss_sweep.append(loss_cum / fold_len)
 
-        if loss_sweep[-1] < min_loss:
+        if loss_sweep[-1] > min_loss:   #< min_loss:
             min_loss = loss_sweep[-1]
             min_parameter1 = parameter1[-1]
             min_parameter2 = parameter2[-1]
@@ -138,12 +140,12 @@ def load_sweep_results(file_name, parameters : tuple):
     print(f"{parameters[0]} : ", min_parameter1)
     print(f"{parameters[1]} : ", min_parameter2)
 
-    Z= np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
+    Z= np.array(loss_sweep).reshape(len(y),len(x))#np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
     plt.xticks(np.arange(len(x)), labels=x)
     plt.yticks(np.arange(len(y)), labels=y)
 
     #plt.pcolormesh(X,Y,Z)
-    plt.imshow(Z, norm=colors.LogNorm(), interpolation="bilinear")
+    plt.imshow(Z)#, norm=colors.LogNorm(), interpolation="bilinear")
     plt.xlabel(parameters[0])
     plt.ylabel(parameters[1])
     plt.colorbar()

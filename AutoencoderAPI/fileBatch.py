@@ -20,7 +20,7 @@ torch.manual_seed(42)
 
 
 
-class function:
+class fileBatch:
 
     def __init__(self):
         
@@ -115,7 +115,7 @@ class function:
             - Three dimensional tensor containing the batch samples.
               Tensor of shape (N,0,S), where N is the number of sample and S is the size of each sample.    
         """
-        skip = config['network']["skip_elements"]
+        skip = config['train']["skip_elements"]
         folder = f"{config['files']['dataset']}"
         size = config['files']['input_dimension']
 
@@ -309,7 +309,7 @@ class function:
                 
                 train_loss = validation_loss = train_number = validation_number = 0
 
-                for batch_files in tqdm(train_files[fold_index], desc="Train batch"):   
+                for batch_files in train_files[fold_index]:   
                 
                     X_train = self.custom_dataloader(config, batch_files)
                     
@@ -317,7 +317,7 @@ class function:
                     train_loss += train_loss_
                     train_number += train_number_
 
-                for batch_files in tqdm(validation_files[fold_index], desc="Validation batch"):
+                for batch_files in validation_files[fold_index]:
 
                     X_validation = self.custom_dataloader(config, batch_files)
 

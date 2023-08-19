@@ -23,7 +23,7 @@ class build_autoencoder(nn.Module):
         """
         super(build_autoencoder, self).__init__()
         
-        if config['run']['layer_number'] % 2 != 0:
+        if config['network']['layer_number'] % 2 != 0:
             print("Invalid number of layer (needs to be even number)")
 
         # Layer type
@@ -57,11 +57,11 @@ class build_autoencoder(nn.Module):
         # Number of layer
         #encoder_layers = np.linspace(config["input_dimension"], config["output_dimension"], int(config['layer_number'] / 2 + 1), dtype=int)
         #layer_list = np.concatenate((encoder_layers, np.flip(encoder_layers)[1:]))
-        skip = config['network']["skip_elements"]
+        skip = config['train']["skip_elements"]
         size = config['files']['input_dimension']
-        layer_list = config['run']['layer_list']
+        layer_list = config['network']['layer_list']
         layer_list[0] = layer_list[-1] = int(size / skip)
-        activation_list = config['run']['activation_list']
+        activation_list = config['network']['activation_list']
         
         # Build network
         self.encoder = nn.Sequential()

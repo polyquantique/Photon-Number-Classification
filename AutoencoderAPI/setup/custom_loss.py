@@ -78,3 +78,18 @@ class sklearn_kmeans_silhouette_loss:
         mse = nn.MSELoss()
 
         return silhouette_loss/10 + mse(output, data)
+    
+
+
+class triplet_MSE:
+
+    def __init__(self) -> None:
+        pass
+
+    def forward(self, input_, output_, negative, alpha):
+        trip = nn.TripletMarginLoss()
+        triplet = trip(input_, output_, negative)
+        mse = nn.MSELoss()
+        MSE = mse(output_, input_)
+
+        return alpha * triplet + MSE
