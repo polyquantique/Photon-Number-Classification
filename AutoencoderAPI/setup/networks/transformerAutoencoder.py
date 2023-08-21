@@ -1,6 +1,5 @@
 from torch import nn
 
-
 class build_autoencoder(nn.Module):
     def __init__(self, config: dict) -> None:
         """

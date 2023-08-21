@@ -23,8 +23,8 @@ torch.manual_seed(42)
 
 class pytorchDataloader:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self):
+        self.device = None
 
 
     def train_epoch(self, network, X_train, optimizer, criterion):
@@ -151,16 +151,16 @@ class pytorchDataloader:
 
     def setup(self, config):
 
-        # log path and folder creation to store results
-        if config['sweep']['sweep_name'] is not None:
-            log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
-        else:
-            config['internal'] = {}
-            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        try:
+            if config['sweep']:
+                folder_name = ""
+        except:
+            folder_name = "/run-" + datetime.now().strftime(r"%Y-%m-%d-%H-%M")
 
-        # Define device and runs on Cuda is available
-        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
+
+        # Define device and runs on Cuda if is available
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Define dataset
         data = build_dataset(config)

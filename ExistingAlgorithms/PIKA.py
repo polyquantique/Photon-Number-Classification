@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from tqdm.notebook import tqdm
+from scipy.stats import poisson
 from scipy.special import gamma, loggamma
 from numpy.random import shuffle, choice
 import matplotlib.pyplot as plt
@@ -81,8 +82,9 @@ class PIKA():
         if lower_limit < 0: lower_limit = 0
 
         N = np.arange(lower_limit, upper_limit + 1)
-        prob = np.absolute( np.exp(-self.N_mean) * self.N_mean**N / gamma(N + 1) )
-        int_prob = np.rint(prob / np.sum(prob) * self.nb_samples).astype(int)
+        prob = poisson.pmf(N, self.N_mean)
+        #prob = np.absolute( np.exp(-self.N_mean) * self.N_mean**N / gamma(N + 1) )
+        int_prob = np.rint(prob / np.sum(prob) * self.nb_samples).astype('int64')
 
         N = N[int_prob > 0]
         int_prob = int_prob[int_prob > 0]
@@ -250,7 +252,6 @@ class PIKA():
 
     def run_PIKA(self, plot=False):
 
-        hist_O_KPC = 0
         N_mean_list = []
         O_KPC_list_epoch = []
 
@@ -295,15 +296,15 @@ class PIKA():
                                 clusters, del_wave_idx = self.Update_Param(clusters, waveform, inner_cluster_idx, add_idx, del_idx, del_wave_idx)
 
     
-            alpha = 1e1
-            if hist_O_KPC == 0:
-                hist_O_KPC = O_KPC_list[0]
+            alpha = 1e-5
+            if len(O_KPC_list_epoch) == 0:
+                O_KPC_list_epoch.append(O_KPC_list[0])
+                N_mean_list.append(self.N_mean)
 
             O_KPC_list_epoch.append(O_KPC_list[-1])
             N_mean_list.append(self.N_mean)
-            self.N_mean = self.N_mean - alpha * (O_KPC_list[-1] - hist_O_KPC) / O_KPC_list[-1]
-            
-            hist_O_KPC = O_KPC_list[-1]
+
+            self.N_mean = N_mean_list[-1] +1#- alpha * (O_KPC_list_epoch[-1] - O_KPC_list_epoch[-2]) / N_mean_list[-2]
 
         if plot:
             
@@ -318,14 +319,17 @@ class PIKA():
             # Mean traces for each photon number
             plt.figure()
             pl = [plt.plot(wave, label=f"{N[index]}") for index, wave in enumerate(self.V_mean)]
+            plt.ticklabel_format(useOffset=False)
             plt.legend()
             plt.show()
 
             plt.figure()
             plt.plot(N_mean_list)
+            plt.ticklabel_format(useOffset=False)
             plt.ylabel("Average photon number")
 
             plt.figure()
+            plt.ticklabel_format(useOffset=False)
             plt.plot(O_KPC_list_epoch)
             plt.ylabel(r"$O_{KPC}$")
 
