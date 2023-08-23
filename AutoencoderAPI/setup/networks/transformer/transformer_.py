@@ -1,4 +1,4 @@
-from .positionalEncoder import PositionalEncoder
+from .positionalEncoding import PositionalEncoding
 import torch.nn as nn 
 from torch import nn, Tensor
 import torch.nn.functional as F

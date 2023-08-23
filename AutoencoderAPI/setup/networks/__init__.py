@@ -1,3 +1,3 @@
 from .autoencoder import *
-from .positionalEncoder import *
 from .transformer import *
+from .transformerAutoencoder import *

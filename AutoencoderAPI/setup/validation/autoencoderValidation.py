@@ -1,7 +1,7 @@
 import torch
 
 
-def validation_test(config, network, X, criterion, store=False):
+def validation(network, X, criterion, store=False):
     """
     # validation_test
 

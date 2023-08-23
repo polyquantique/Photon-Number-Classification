@@ -1,8 +1,8 @@
 from torch import nn
+from .positionalEncoding import PositionalEncoding
 
-
-class build_autoencoder(nn.Module):
-    def __init__(self, config: dict) -> None:
+class transformerLayer(nn.Module):
+    def __init__(self, input_size, output_size, config):
         """
         
         """
@@ -12,17 +12,12 @@ class build_autoencoder(nn.Module):
         size = config['files']['input_dimension']
         input_size = int(size / skip)
 
-        #self.input_layer = nn.Linear(input_size, )
-        #self.pos_encoder = PositionalEncoding(d_model = input_size, 
-        #                                      max_len = input_size)
-        #self.transformer = nn.TransformerEncoderLayer(d_model = input_size,
-        #                                              nhead = config['network']['nhead'])
    
-        #self.pos_encoder = PositionalEncoding(d_model=1)
-        self.attention = nn.MultiheadAttention(embed_dim=input_size, num_heads=config['network']['nhead'])
+        self.pos_encoder = PositionalEncoding(d_model = config['embed_dim'], max_len = 5000)
+        self.attention = nn.MultiheadAttention(embed_dim = config['embed_dim'], num_heads = config['network']['nhead'])
         self.norm = nn.LayerNorm()
         self.feed_forward = nn.GELU()
-        #self.encoder.append
+
         
  
 

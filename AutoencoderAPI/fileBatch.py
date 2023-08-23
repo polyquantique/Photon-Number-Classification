@@ -159,7 +159,7 @@ class fileBatch:
         cumu_loss = 0
         network.train()
         list_ = range(X_train.size(0))
-        for input_ in X_train: #tqdm(enumerate(X_train) , total=len(X_train)): #
+        for input_ in tqdm(X_train, total=len(X_train)): #X_train:
             # Use cuda if available
             input_ = input_.float().to(config['internal']['device'])
             # Zero gradient

@@ -17,7 +17,7 @@ class pytorch_kmeans_silhouette_loss():
 
         feature = network(X, encoding=True).reshape(-1,1)
 
-        kmeans = pytorch_kmeans(n_clusters=30, mode='euclidean', verbose=False)
+        kmeans = pytorch_kmeans(n_clusters=23, mode='euclidean', verbose=False)
         labels = kmeans.fit_predict(feature)
 
         score = pytorch_silhouette_score()
@@ -25,7 +25,7 @@ class pytorch_kmeans_silhouette_loss():
         mse = nn.MSELoss()
         loss = mse(output, data)
 
-        return 1 / score  + loss
+        return 1e-4 / score  + loss
 
 
 # Class specific import
@@ -72,7 +72,7 @@ class sklearn_kmeans_silhouette_loss:
         feature = network(X, encoding=True).detach().numpy().reshape(-1,1)
 
         #labels = KMeans(n_clusters=21, random_state=42, n_init='auto').fit_predict(X_numpy)
-        labels, centroids = kmeans1d.cluster(feature, 30)
+        labels, centroids = kmeans1d.cluster(feature, 23)
 
         silhouette_loss = davies_bouldin_score(feature, labels)
         mse = nn.MSELoss()

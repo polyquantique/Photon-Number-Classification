@@ -1,4 +1,4 @@
-
+from tqdm.notebook import tqdm
 
 def train(network, X_train, optimizer, criterion):
     """
@@ -28,7 +28,7 @@ def train(network, X_train, optimizer, criterion):
     cumu_loss = 0
     _ = None
     network.train()
-    for input_ in X_train:
+    for input_ in tqdm(X_train):
         # Zero gradient
         optimizer.zero_grad()
         # Forward
