@@ -1,9 +1,12 @@
 
 /Autoencoder Log/*
-/Datasets/*
+/Datasets
 /AutoencoderAPI/__pycache__
 /AutoencoderAPI/setup/__pycache__
 /AutoencoderAPI/setup/datasets/__pycache__
 /AutoencoderAPI/setup/networks/__pycache__
+/AutoencoderAPI/setup/networks/transformer/__pycache__
+/AutoencoderAPI/setup/train/__pycache__
+/AutoencoderAPI/setup/validation/__pycache__
 /AutoencoderAPI/utils/__pycache__
 /ExistingAlgorithms/__pycache__

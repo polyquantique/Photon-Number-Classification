@@ -57,11 +57,11 @@ def validation(network, X, criterion, store=False):
                 decode = network(encode, decoding =True)
 
                 save_encode = torch.clone(encode).numpy()
-                results['encode'].append(save_encode[0])
+                results['encode'].append(save_encode[0][0])
 
                 if index < 2:
-                    results['input'].append(input_.clone().numpy()[0])
-                    results['decode'].append(decode.clone().numpy()[0])
+                    results['input'].append(torch.flatten(input_).clone().numpy())
+                    results['decode'].append(torch.flatten(decode).clone().numpy())
 
             else:
                 decode = network(input_)
@@ -73,4 +73,4 @@ def validation(network, X, criterion, store=False):
     if store:
         return cumu_loss / len(X), results
     
-    return cumu_loss, len(X)
+    return cumu_loss / len(X)

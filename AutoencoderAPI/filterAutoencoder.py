@@ -21,6 +21,7 @@ class filterAutoencoder():
 
     def filtering(self, X, threshold):
 
+        #input_ = X.view(-1, 1, self.config['files']['input_dimension'])
         input_ = torch.from_numpy(X).view(-1, 1, self.config['files']['input_dimension']).float()
         output_ = self.model(input_)
         mse = nn.MSELoss()

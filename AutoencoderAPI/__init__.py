@@ -6,3 +6,5 @@ from .recurentTriplet import *
 from .pytorchDataloader import *
 from .trueBatch import *
 from .filterAutoencoder import *
+from .autoencoder import *
+

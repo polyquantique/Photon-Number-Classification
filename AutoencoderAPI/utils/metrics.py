@@ -4,12 +4,12 @@ from sklearn.metrics import silhouette_score
 from tqdm.notebook import tqdm
 
 
-def silhouette_kmean(feature, max_cluster):
+def silhouette_kmean(feature, min_cluster, max_cluster):
 
     feature = np.array(feature).reshape(-1,1)[::10]
     scores = []
 
-    for cluster_number in tqdm(range(3,max_cluster+1) , desc="Clusters") :
+    for cluster_number in tqdm(range(min_cluster+1,max_cluster+1) , desc="Clusters") :
         predict = KMeans(n_clusters=cluster_number, random_state=42, algorithm='lloyd', n_init='auto').fit_predict(feature)
         if len(np.unique(predict)) != 1:
             scores.append(silhouette_score(feature, predict))

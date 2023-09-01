@@ -22,7 +22,7 @@ def plot_hist(X, xlabel=None, ylabel=None, bins=700):
 # Class specific import
 from .metrics import silhouette_kmean
 
-def load_run_results(file_name):
+def load_run_results(file_name, min_cluster, max_cluster):
     """
     # load_run_results
 
@@ -48,10 +48,10 @@ def load_run_results(file_name):
 
         results = open_object(f"{path}/{fold}/results.bin")
 
-        scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], 40)
+        scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], min_cluster, max_cluster)
         print(f"Optimal number of clusters : {optimal_cluster}")
         
-        bins = np.linspace(min(results['encode']), max(results['encode']), 1_000).reshape(-1)
+        bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).reshape(-1)
 
         for index_cluster, cluster in enumerate(clusters):
             axs[0,0].hist(cluster , bins, alpha = 0.5, label=f"{index_cluster}")
@@ -59,8 +59,8 @@ def load_run_results(file_name):
         axs[0,0].set_ylabel("counts")
         axs[0,0].legend(ncol=3)
             
-        axs[1,0].plot(range(2, len(scores)+2), scores, label="Approx Silhouette")
-        axs[1,0].hlines(optimal_score, 2, len(scores)+2, linestyles='dashed', label="Final Silhouette")
+        axs[1,0].plot(range(min_cluster+1, max_cluster+1), scores, label="Approx Silhouette")
+        axs[1,0].hlines(optimal_score, min_cluster+1, max_cluster+1, linestyles='dashed', label="Final Silhouette")
         axs[1,0].set_ylabel("Clustering score")
         axs[1,0].set_xlabel("Number of cluster")
         axs[1,0].legend()
@@ -80,9 +80,9 @@ def load_run_results(file_name):
         axs[0,1].set_ylabel("loss")
         axs[0,1].set_xlabel("epoch")
 
-    config_file = open_object(f"{path}/{fold}/log.bin")
-    print("Activation list : ", config_file['network']['activation_list'])
-    print("Layer list : ", config_file['network']['layer_list'])
+    #config_file = open_object(f"{path}/{fold}/log.bin")
+    #print("Activation list : ", config_file['network']['activation_list'])
+    #print("Layer list : ", config_file['network']['layer_list'])
     print("Optimal Silhouette score : ", optimal_score)
 
 

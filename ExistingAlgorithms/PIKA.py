@@ -304,7 +304,7 @@ class PIKA():
             O_KPC_list_epoch.append(O_KPC_list[-1])
             N_mean_list.append(self.N_mean)
 
-            self.N_mean = N_mean_list[-1] +1#- alpha * (O_KPC_list_epoch[-1] - O_KPC_list_epoch[-2]) / N_mean_list[-2]
+            self.N_mean = N_mean_list[-1] - alpha * (O_KPC_list_epoch[-1] - O_KPC_list_epoch[-2]) / N_mean_list[-2]
 
         if plot:
             

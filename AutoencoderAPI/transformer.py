@@ -27,7 +27,49 @@ class transformer():
         self.device = None
 
     def setup(self, config):
+        """
+        # setup
+        
+        Load dataset from files and define the log file name.
 
+        Parameters
+        ----------
+        - config : dict : 
+                - Dictionary containing the experiment parameters. 
+        
+        Returns
+        -------
+        - data : torch.tensor :
+            - Dataset.
+        - log_path : str :
+            - Path where the results of the experiment are stored.
+
+        Example
+        -------
+
+        Exemple of config :
+
+        ```
+        config_Transformer = {
+            'files' : {
+                    'dataset'                  : "Datasets/NIST (250)",
+                    'path_save'                : 'Autoencoder Log/',
+                    'input_dimension'          : 250
+                    },
+            'network' : {
+                    'nhead'                    : 250,
+                    'dropout'                  : 0.1,
+                    'sequence_len'             : 1       
+                    },
+            'train' : {
+                    'optimizer'                : 'Adam',
+                    'criterion'                : 'MSELoss', 
+                    'epochs'                   : 8,
+                    'learning_rate'            : 1e-6
+                    }
+            }
+        ```
+        """
         try:
             if config['sweep']:
                 folder_name = ""
@@ -40,21 +82,49 @@ class transformer():
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Define dataset
-        skip = config['train']["skip_elements"]
-        folder = f"{config['files']['dataset']}"
+        sequence = config['network']["sequence_len"]
         size = config['files']['input_dimension']
+        config['network']["embed_dim"] = int(size / sequence)
+
+        folder = f"{config['files']['dataset']}"
         files = listdir(folder)
 
         X = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
-        if skip > 1: X = X[:, 1::skip]
-        
-        data = torch.from_numpy(X).view(-1, 1, int(size / skip)).float().to(self.device)
+
+        data = torch.from_numpy(X).view(-1, sequence, size).float().to(self.device) #config['network']["embed_dim"]
 
         return config, data, log_path
 
 
     def split_dataset(self, data):
+        """
+        # split_dataset
+        
+        Split the dataset into a training, validation and testing set.
+        The index of the sets are given as an output.
 
+        Repartition of the original dataset:
+
+        - Train : 50 %
+        - Validation : 25 %
+        - Test : 25 %
+
+
+        Parameters
+        ----------
+        - data : torch.tensor : 
+                - Total dataset used for training, validating and testing the model.
+  
+        
+        Returns
+        -------
+        - train_index : torch.tensor :
+            - Train indexes
+        - validation_index : torch.tensor :
+            - Validation indexes
+        - test_index : torch.tensor :
+            - Test indexes
+        """
         len_ = data.size(0)
         index = torch.randperm(len_)
         
@@ -84,6 +154,33 @@ class transformer():
         Returns
         -------
         - None
+
+
+        Example
+        -------
+
+        Exemple of config :
+
+        ```
+        config_Transformer = {
+            'files' : {
+                    'dataset'                  : "Datasets/NIST (250)",
+                    'path_save'                : 'Autoencoder Log/',
+                    'input_dimension'          : 250
+                    },
+            'network' : {
+                    'nhead'                    : 250,
+                    'dropout'                  : 0.1,
+                    'sequence_len'             : 1       
+                    },
+            'train' : {
+                    'optimizer'                : 'Adam',
+                    'criterion'                : 'MSELoss', 
+                    'epochs'                   : 8,
+                    'learning_rate'            : 1e-6
+                    }
+            }
+        ```
         """
         # Initialization of loss and result arrays
         loss = {'train_loss'        : [], 
@@ -92,7 +189,6 @@ class transformer():
                 }
 
         config, data, log_path = self.setup(config)
-        learning_rate = config['train']['learning_rate']
         train_index, validation_index, test_index = self.split_dataset(data)
 
         network = build_autoencoder(config).float().to(self.device)

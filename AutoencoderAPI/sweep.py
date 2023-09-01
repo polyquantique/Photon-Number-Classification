@@ -2,6 +2,7 @@ from tqdm.notebook import tqdm
 from random import choice, choices
 from sklearn.model_selection import ParameterGrid
 from .recurentTriplet import recurentTriplet
+from .transformer import transformer
 
 
 
@@ -14,8 +15,6 @@ class sweep:
     def grid_search(self, name, run_config, sweep_config):
         """
         # Sweep 
-
-        sweep(name, test_number, config)
 
         Train a series of neural networks 
 
@@ -46,7 +45,7 @@ class sweep:
                 run_config['train'][value] = parameters[value]
             
             run_config['files']['path_save'] = f"{path_save}/{name}/run {str(sweep_index).rjust(len(str(test_number)), '0')}"
-            exp = recurentTriplet()
+            exp = transformer()
             exp.run(run_config)
             sweep_index += 1
 
@@ -86,9 +85,3 @@ class sweep:
                 pbar.close()
 
 
-
-
-
-        #              if config['sweep']['sweep_name'] is not None:
-        #    log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
-        #else:
