@@ -8,6 +8,8 @@ from sklearn.manifold import trustworthiness
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 
+import warnings
+warnings.filterwarnings("ignore")
 
 class compare():
 

@@ -58,4 +58,8 @@ Neural networks allow for a wide variety of architectures and therefore their ev
 [3] ‘MultiheadAttention — PyTorch 2.0 documentation’. https://pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention.html (accessed Sep. 01, 2023).
 
 
+[4] Y. Ichinohe et al., ‘Application of Deep Learning to the Evaluation of Goodness in the Waveform Processing of Transition-Edge Sensor Calorimeters’, J Low Temp Phys, vol. 209, no. 5, pp. 1008–1016, Dec. 2022, doi: 10.1007/s10909-022-02719-7.
+
+
+
 

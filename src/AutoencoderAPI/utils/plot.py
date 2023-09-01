@@ -57,7 +57,7 @@ def load_run_results(file_name, min_cluster, max_cluster):
         axs[0,0].set_ylabel("counts")
         axs[0,0].legend(ncol=3)
             
-        axs[1,0].plot(range(min_cluster+1, max_cluster+1), scores, label="Approx Silhouette")
+        axs[1,0].plot(range(min_cluster, max_cluster+1), scores, label="Approx Silhouette")
         axs[1,0].hlines(optimal_score, min_cluster+1, max_cluster+1, linestyles='dashed', label="Final Silhouette")
         axs[1,0].set_ylabel("Clustering score")
         axs[1,0].set_xlabel("Number of cluster")

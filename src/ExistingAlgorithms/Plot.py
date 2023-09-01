@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-pastel')
 
 def plot_1D(X_l):
 
     plt.figure(figsize=(10,5))
-    plt.hist(X_l, bins=10_000)
+    plt.hist(X_l, bins=5000)
     plt.xlabel('Feature Space')
     plt.ylabel('Counts')
     plt.show()
