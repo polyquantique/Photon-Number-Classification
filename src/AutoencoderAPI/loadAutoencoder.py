@@ -1,10 +1,11 @@
 import torch
 from torch import nn
+import numpy as np
 
 from .utils.files import open_object
 from .setup.networks.autoencoder import build_autoencoder
 
-def loadAutoencoder(X_init, model, filter=False, threshold=0.0005):
+def loadAutoencoder(X_init, model_path, filter=False, threshold=0.0005):
     """
     # loadAutoencoder
 
@@ -21,11 +22,10 @@ def loadAutoencoder(X_init, model, filter=False, threshold=0.0005):
     - None
 
     """
-    path = f"Autoencoder Log/{model}"
-    config_load = open_object(f"{path}/log.bin")
+    config_load = open_object(f"{model_path}/log.bin")
 
     network = build_autoencoder(config_load)
-    network.load_state_dict(torch.load(f"{path}/model.pt"))
+    network.load_state_dict(torch.load(f"{model_path}/model.pt"))
     network.eval()
 
     X_pytorch = torch.from_numpy(X_init).view(-1, 1, config_load['files']['input_dimension']).float()
@@ -46,5 +46,7 @@ def loadAutoencoder(X_init, model, filter=False, threshold=0.0005):
 
     X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
     X_reconst = X_reconst.detach().numpy().reshape(-1, config_load['files']['input_dimension'])
+
+    X_low_dim = (X_low_dim - np.min(X_low_dim)) / (np.max(X_low_dim) - np.min(X_low_dim))
 
     return X_init, X_reconst, X_low_dim

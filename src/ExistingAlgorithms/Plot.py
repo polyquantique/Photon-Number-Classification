@@ -16,4 +16,6 @@ def plot_traces(X):
     [plt.plot(x, alpha = 0.01) for x in X[::20]]
     plt.xlabel('Time (a.u.)')
     plt.ylabel('Voltage (a.u.)')
+    plt.xticks([])
+    plt.yticks([])
     plt.show()

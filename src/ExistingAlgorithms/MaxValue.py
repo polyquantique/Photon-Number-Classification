@@ -8,5 +8,7 @@ def max_value(X_init, filter=False):
 
     X_low_dim = np.max(X_init, axis=1).reshape(-1,1)
     X_reconst = np.array([None])
+
+    X_low_dim = (X_low_dim - np.min(X_low_dim)) / (np.max(X_low_dim) - np.min(X_low_dim))
     
     return X_init, X_reconst, X_low_dim

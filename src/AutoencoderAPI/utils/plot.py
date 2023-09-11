@@ -38,7 +38,7 @@ def load_run_results(file_name, min_cluster, max_cluster):
     -------
     - None
     """
-    path = f"Autoencoder Log/{file_name}"
+    path = f"{file_name}"
     
     for index_fold, fold in enumerate(listdir(path)):
 
@@ -46,7 +46,7 @@ def load_run_results(file_name, min_cluster, max_cluster):
 
         results = open_object(f"{path}/{fold}/results.bin")
 
-        scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], min_cluster, max_cluster)
+        scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], min_cluster, max_cluster).get_informations()
         print(f"Optimal number of clusters : {optimal_cluster}")
         
         bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).reshape(-1)

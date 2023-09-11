@@ -141,7 +141,7 @@ class recurentTriplet():
         return train_index, validation_index, test_index
 
 
-    def update_cluster(self, network, X, n_cluster, output=False):
+    def update_cluster(self, network, X, n_cluster, balance=False):
         """
         # update_cluster
         
@@ -163,14 +163,12 @@ class recurentTriplet():
         
         Returns
         -------
-        - output = `True` 
-            - score : float
-                - Silhouette score of the input data with the optimal cluster number contained in n_clusters.
-        - output = `False` 
-            - labels : torch.tensor
-                - Tensor of labels for every element in X.
-            - n_cluster : list
-                - Updated number of clusters used for k-means and for which a Silhouette score is assigned.
+        - labels : torch.tensor
+            - Tensor of labels for every element in X.
+        - n_cluster : list
+            - Updated number of clusters used for k-means and for which a Silhouette score is assigned.
+        - updated_dataset :
+            -
         """
 
         score = 0
@@ -199,18 +197,31 @@ class recurentTriplet():
             kmeans = pytorch_kmeans(n_clusters=optimal_cluster, mode='euclidean', verbose=False)
             labels = kmeans.fit_predict(encode)
 
-            if optimal_cluster <= 7: optimal_cluster = 7
-            n_cluster = range(optimal_cluster-5 , optimal_cluster+5)
+            
 
-            if output:
-                if len(np.unique(temp_labels)) < 2:
-                    score = 0
-                else:
-                    score = sil(encode, labels)
+            if balance:
+                count_list = np.bincount(labels)
+                max_count = np.max(count_list)
+                X_new = X
+                labels_new = labels
+                for index, count in enumerate(count_list):
+                    if count < max_count/2:
+                        X_new = torch.cat((X_new, X[labels == index]))
+                        labels_new = torch.cat((labels_new, labels[labels == index]))
 
-                return score
-        
-        return labels, n_cluster
+                rand_index = torch.randperm(X_new.size(0))
+                X_new = X_new[rand_index]
+                labels_new = labels_new[rand_index]                
+
+                print('Size of training set : ', X_new.size(0))
+                print('Optimal number of cluster : ', optimal_cluster)
+
+                if optimal_cluster <= 7: optimal_cluster = 7
+                n_cluster = range(optimal_cluster-5 , optimal_cluster+5)
+
+                return labels_new, n_cluster, X_new
+                        
+        return labels
                 
 
     def run(self, config):
@@ -292,19 +303,20 @@ class recurentTriplet():
         criterion = build_criterion(config)
         optimizer = build_optimizer(network, config)
 
-        n_cluster = range(4,10)
+        n_cluster = range(17,25)
+        train_dataset = data[train_index]
         for epoch in tqdm(range(config['train']['epochs']) , desc="Epoch Triplet"):
-            
-            train_labels, n_cluster = self.update_cluster(network, data[train_index], n_cluster)
-            train_loss = train_Triplet(config, network, data[train_index], optimizer, criterion, train_labels)
+            #, train_dataset
+            train_labels, n_cluster, train_dataset = self.update_cluster(network, train_dataset, n_cluster, balance=True)
+            train_loss = train_Triplet(config, network, train_dataset, optimizer, criterion, train_labels)
 
-            validation_labels, _ = self.update_cluster(network, data[validation_index], n_cluster)
+            validation_labels = self.update_cluster(network, data[validation_index], n_cluster)
             validation_loss = validation(config['train']['alpha'], network, data[validation_index], criterion, validation_labels)
 
             loss['train_loss'].append(train_loss) # Triplet
             loss['validation_loss'].append(validation_loss) # Triplet
 
-        test_labels, _ = self.update_cluster(network, data[test_index], n_cluster)
+        test_labels = self.update_cluster(network, data[test_index], n_cluster)
         test_loss, results = validation(config['train']['alpha'], network, data[test_index], criterion, test_labels, store=True)
         loss['test_loss'].append(test_loss)
 

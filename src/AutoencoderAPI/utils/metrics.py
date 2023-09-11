@@ -4,36 +4,51 @@ from sklearn.metrics import silhouette_score
 from tqdm.notebook import tqdm
 
 
-def silhouette_kmean(feature, min_cluster, max_cluster):
+class silhouette_kmean():
 
-    feature = np.array(feature).reshape(-1,1)[::10]
-    scores = []
+    def __init__(self, feature, min_cluster, max_cluster):
 
-    for cluster_number in tqdm(range(min_cluster,max_cluster+1) , desc="Clusters") :
-        predict = KMeans(n_clusters=cluster_number, random_state=42, algorithm='lloyd', n_init='auto').fit_predict(feature)
-        if len(np.unique(predict)) != 1:
-            scores.append(silhouette_score(feature, predict))
-        else:
-            scores.append(0)
+        feature = np.array(feature).reshape(-1,1)[::10]
+        scores = []
 
-    optimal_cluster = np.argmax(scores) + min_cluster
+        for cluster_number in tqdm(range(min_cluster,max_cluster+1) , desc="Clusters") :
+            predict = KMeans(n_clusters=cluster_number, random_state=42, algorithm='lloyd', n_init='auto').fit_predict(feature)
+            if len(np.unique(predict)) != 1:
+                scores.append(silhouette_score(feature, predict))
+            else:
+                scores.append(0)
 
-    km = KMeans(n_clusters=optimal_cluster, random_state=42)
-    fit = km.fit(feature)
+        optimal_cluster = np.argmax(scores) + min_cluster
+        km = KMeans(n_clusters=optimal_cluster, random_state=42, algorithm='lloyd', n_init='auto')
+        fit = km.fit(feature)
 
-    centroids = fit.cluster_centers_
-    labels = fit.labels_
-    unique_label = np.unique(labels)
+        self.feature = feature
 
-    try:
-        optimal_score = silhouette_score(feature, labels)
-    except:
-        optimal_score = 0
+        self.scores = scores
+        self.optimal_cluster = optimal_cluster
+        
+        self.fit = fit
+        self.cluster_centers = fit.cluster_centers_
 
-    clusters = []
-    for label in unique_label:
-        clusters.append(feature[labels == label])
+    def get_labels(self):
+        return self.fit.labels_
 
-    centroids, clusters = zip(*sorted(zip(centroids, clusters)))
+    def get_centeroids(self):
+        return self.fit.cluster_centers_
+    
+    def get_informations(self):
+        labels = self.fit.labels_
+        unique_label = np.unique(labels)
 
-    return scores, optimal_cluster, optimal_score, clusters
+        try:
+            optimal_score = silhouette_score(self.feature, labels)
+        except:
+            optimal_score = 0
+
+        clusters = []
+        for label in unique_label:
+            clusters.append(self.feature[labels == label])
+
+        centroids, clusters = zip(*sorted(zip(self.cluster_centers, clusters)))
+
+        return self.scores, self.optimal_cluster, optimal_score, clusters
