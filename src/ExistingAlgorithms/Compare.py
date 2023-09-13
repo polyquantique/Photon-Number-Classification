@@ -3,6 +3,9 @@ import numpy as np
 from tqdm.notebook import tqdm
 from numpy.linalg import norm
 from sklearn.metrics import mean_squared_error
+from sklearn.neighbors import KernelDensity
+from bisect import bisect_right
+from scipy.signal import argrelextrema
 
 
 from sklearn.manifold import trustworthiness
@@ -41,7 +44,7 @@ class compare():
                 clusters = KMeans(n_clusters=cluster_number, random_state=42, init="k-means++", n_init='auto').fit_predict(X_low_dim[::10])
                 temp_score.append(score(X_low_dim[::10], clusters))
 
-        opt_n_clusters = 23 #eval_cluster[np.argmax(temp_score)]
+        opt_n_clusters = eval_cluster[np.argmax(temp_score)]
         opt_clusters = KMeans(n_clusters=opt_n_clusters, random_state=42, init="k-means++", n_init='auto').fit_predict(X_low_dim)
 
         return score(X_low_dim, opt_clusters)
@@ -57,6 +60,24 @@ class compare():
         return self.score_kmeans(X, X_low_dim, davies_bouldin_score)
     
 
+    def kernel_density(self, X, X_low_dim):
+
+        X_low_dim = X_low_dim.reshape(-1,1)
+        min_ = np.min(X_low_dim)
+        max_ = np.max(X_low_dim)
+        bw = len(X_low_dim) **(-1./(1+4)) / 4#max_ - min_ / 1000
+        kd = KernelDensity(kernel='gaussian', bandwidth=bw).fit(X_low_dim)
+        space = np.linspace(min_, max_, 1000).reshape(-1,1)
+        density = kd.score_samples(space)
+
+        mins = space[argrelextrema(density, np.less)[0]].flatten()
+        labels = np.array([bisect_right(mins, i) for i in X_low_dim])
+        
+        if len(np.unique(labels)) < 2:
+            return 0
+  
+        return silhouette_score(X_low_dim, labels)
+
     def quality_metrics(self, X_init, X_reconst, X_low_dim, Title):
         """
         0 : metric(X, X_reconst)
@@ -71,6 +92,7 @@ class compare():
                         ('silhouette'         , self.silhouette_kmeans         , 1), 
                         ('Calinski Harabasz'  , self.calinski_harabasz_kmeans  , 1),
                         ('Davies Bouldin'     , self.davies_bouldin_kmeans     , 1),
+                        ('Silhouette\nKernel Density'   , self.kernel_density, 1),
                         ('trustworthiness\nEuclidian'   , self.trust_euclidian  , 1), 
                         ('trustworthiness\nCosine'      , self.trust_cosine  , 1), 
                         ('MSE'                      , self.MSE                 , 0)

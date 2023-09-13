@@ -13,19 +13,15 @@ class clustering():
         self.max_cluster = max_cluster
 
         sk = silhouette_kmean(X, min_cluster, max_cluster)
-        scores, optimal_cluster, optimal_score, clusters = sk.get_informations()
         
         self.bins = np.linspace(min(X), max(X), 1_000).reshape(-1)
 
-        self.labels_ = sk.get_labels()
-        self.optimal_cluster = optimal_cluster
-        self.optimal_score = optimal_score
-        self.clusters = clusters
-        self.scores = scores
+        self.label_mapping = sk.label_mapping
+        self.optimal_cluster = sk.optimal_cluster
+        self.optimal_score = sk.optimal_score
+        self.clusters = sk.clusters
+        self.scores = sk.scores
         self.fit = sk.fit
-
-    def labels(self):
-        return self.labels_
 
     def plot_clustering(self):
 
@@ -34,7 +30,7 @@ class clustering():
 
         plt.figure()
         for index_cluster, cluster in enumerate(self.clusters):
-            plt.hist(cluster , self.bins, alpha = 0.5, label=f"{index_cluster}")
+            plt.hist(cluster.flatten() , self.bins, alpha = 0.5, label=f"{index_cluster}", fill=True, histtype='step')
         plt.xlabel("feature")
         plt.ylabel("counts")
         plt.legend(ncol=3)

@@ -46,13 +46,17 @@ def load_run_results(file_name, min_cluster, max_cluster):
 
         results = open_object(f"{path}/{fold}/results.bin")
 
-        scores, optimal_cluster, optimal_score, clusters = silhouette_kmean(results['encode'], min_cluster, max_cluster).get_informations()
+        sk = silhouette_kmean(results['encode'], min_cluster, max_cluster)
+        scores = sk.scores 
+        optimal_cluster = sk.optimal_cluster
+        optimal_score = sk.optimal_score
+        clusters = sk.clusters
         print(f"Optimal number of clusters : {optimal_cluster}")
         
-        bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).reshape(-1)
+        bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).flatten()
 
         for index_cluster, cluster in enumerate(clusters):
-            axs[0,0].hist(cluster , bins, alpha = 0.5, label=f"{index_cluster}")
+            axs[0,0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
         axs[0,0].set_xlabel("feature")
         axs[0,0].set_ylabel("counts")
         axs[0,0].legend(ncol=3)

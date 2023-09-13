@@ -1,11 +1,13 @@
 import torch
 import numpy as np
+from sklearn.neighbors import KernelDensity
+
 from .utils.files import open_object
-from .utils.clustering import clustering
+from .utils.kernelDensity import kernel_density
 from .setup.networks.autoencoder import build_autoencoder
 
 
-class autoencoder_kmeans():
+class autoencoder_kerneDensity():
 
     def __init__(self, model_path):
 
@@ -16,28 +18,30 @@ class autoencoder_kmeans():
 
         self.network = network
         self.config_load = config_load
-        self.kmeans = None
+        self.fit = None
         
     
-    def fit_cluster(self, X, min_cluster, max_cluster, plot_silhouette=False, plot_clustering=False):
+    def fit_cluster(self, X, plot_density=False, plot_cluster=False, plot_traces=False, bw_cst=4):
 
         self.network.eval()
+        traces = np.copy(X)
         with torch.no_grad():
             X_pytorch = torch.from_numpy(X).view(-1, 1, self.config_load['files']['input_dimension']).float()
             X_low_dim = self.network(X_pytorch, encoding=True)
 
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
-            cl = clustering(X_low_dim, min_cluster, max_cluster)
+            cl = kernel_density(traces, X_low_dim, bw_cst)
             
-            if plot_silhouette:
-                cl.plot_silhouette()
-            if plot_clustering:
-                cl.plot_clustering()
+        if plot_density:
+            cl.plot_density()
+        if plot_cluster:
+            cl.plot_cluster()
+        if plot_traces:
+            cl.plot_traces()
 
-        self.kmeans = cl.fit
-        self.label_mapping = cl.label_mapping
-
+        self.fit = cl.fit
+        
 
     def get_label(self, X):
 
@@ -46,5 +50,4 @@ class autoencoder_kmeans():
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
-            unsorted_labels = self.kmeans.predict(X_low_dim)
-        return np.array([self.label_mapping[i] for i in unsorted_labels])
+        return self.fit(X_low_dim)
