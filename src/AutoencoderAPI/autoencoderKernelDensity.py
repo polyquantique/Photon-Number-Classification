@@ -19,9 +19,17 @@ class autoencoder_kerneDensity():
         self.network = network
         self.config_load = config_load
         self.fit = None
+        self.flip = False
         
     
-    def fit_cluster(self, X, plot_density=False, plot_cluster=False, plot_traces=False, bw_cst=4):
+    def fit_cluster(self, X, 
+                    plot_density=False, 
+                    plot_cluster=False, 
+                    plot_traces=False, 
+                    bw_cst=4, 
+                    flip=False,
+                    cluster_xlim=None,
+                    traces_xlim=None):
 
         self.network.eval()
         traces = np.copy(X)
@@ -31,14 +39,20 @@ class autoencoder_kerneDensity():
 
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
+            if flip:
+                self.flip = True
+                X_low_dim = -1 * X_low_dim
+            else:
+                self.flip = False
+
             cl = kernel_density(traces, X_low_dim, bw_cst)
             
         if plot_density:
             cl.plot_density()
         if plot_cluster:
-            cl.plot_cluster()
+            cl.plot_cluster(cluster_xlim)
         if plot_traces:
-            cl.plot_traces()
+            cl.plot_traces(traces_xlim)
 
         self.fit = cl.fit
         
@@ -50,4 +64,6 @@ class autoencoder_kerneDensity():
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+            if self.flip:
+                X_low_dim = -1 * X_low_dim
         return self.fit(X_low_dim)

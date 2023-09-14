@@ -11,11 +11,19 @@ from sklearn.neighbors import KernelDensity
 
 class kernel_density():
 
-    def __init__(self, X, X_low, bw_cst=4):
+    def __init__(self, X, X_low, bw_cst=4, flip=False):
 
         X_low = X_low.reshape(-1,1)
+        
+        if flip:
+            self.flip = True
+            X_low = -1 * X_low
+        else:
+            self.flip = False
+
         min_ = np.min(X_low)
         max_ = np.max(X_low)
+
         bw = len(X_low) **(-1./(1+4)) / bw_cst#max_ - min_ / 1000
         kd = KernelDensity(kernel='gaussian', bandwidth=bw).fit(X_low)
         self.space = np.linspace(min_, max_, 1000).reshape(-1,1)
@@ -37,28 +45,30 @@ class kernel_density():
 
     def plot_density(self):
 
-        plt.figure(figsize=(8,5))
+        plt.figure(figsize=(8,5), dpi=100)
         plt.plot(self.space, self.density)
         plt.xlabel("Feature")
         plt.ylabel("Density")
         plt.show()
 
-    def plot_cluster(self):
+    def plot_cluster(self, xlim=None):
 
-        plt.figure(figsize=(8,5))
+        plt.figure(figsize=(7,4), dpi=100)
         n =len(self.clusters_low)
         color = iter(cm.GnBu_r(np.linspace(0, 1, n)))
         for index_cluster, cluster in enumerate(self.clusters_low):
             c = next(color)
             plt.hist(cluster.flatten() , self.bins,color=c, label=f"{index_cluster}", fill=True, histtype='step') #alpha = 0.5
-        plt.xlabel("Feature")
+        plt.xlabel("Feature Space")
         plt.ylabel("Counts")
+        if xlim != None:
+            plt.xlim(xlim[0],xlim[1])
         plt.legend(ncol=3)
         plt.show()
 
-    def plot_traces(self):
+    def plot_traces(self, xlim=None):
 
-        plt.figure(figsize=(8,5))#figsize=(12,8))
+        plt.figure(figsize=(7,4), dpi=100)#figsize=(12,8))
         n =len(self.clusters_traces)
         color = iter(cm.GnBu_r(np.linspace(0, 1, n))) #GnBu_r
         labels = []
@@ -71,10 +81,14 @@ class kernel_density():
                 plt.plot(cluster[i], alpha=0.01, c=c)
         plt.xlabel("Time (a.u.)")
         plt.ylabel("Voltage (a.u.)")
+        if xlim != None:
+            plt.xlim(xlim[0],xlim[1])
+        #plt.xlim(50,300)
         #plt.legend(labels=labels, ncol=3, loc='center left', bbox_to_anchor=(1, 0.5))
         #plt.legend()
         plt.show()
 
     def fit(self, X):
-
+        if self.flip:
+            X = -1*X
         return np.array([bisect_left(self.mins, i) for i in X])
