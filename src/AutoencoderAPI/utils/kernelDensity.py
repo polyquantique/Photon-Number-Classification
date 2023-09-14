@@ -65,6 +65,8 @@ class kernel_density():
         for index_cluster, cluster in enumerate(self.clusters_traces):#tqdm(enumerate(self.clusters_traces), total=n):
             c = next(color)
             labels.append(index_cluster)
+            if len(cluster) > 1000:
+                cluster = cluster[:1000]
             for i, _ in enumerate(cluster):
                 plt.plot(cluster[i], alpha=0.01, c=c)
         plt.xlabel("Time (a.u.)")
