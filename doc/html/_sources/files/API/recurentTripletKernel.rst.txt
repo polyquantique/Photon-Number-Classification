@@ -1,0 +1,9 @@
+
+recurentTripletKernel
+---------------------
+
+.. autoclass:: AutoencoderAPI.recurentTripletKernel.recurentTriplet
+   :members:
+
+
+

@@ -1,0 +1,5 @@
+fileBatch
+---------
+
+.. autoclass:: AutoencoderAPI.fileBatch.fileBatch
+   :members:

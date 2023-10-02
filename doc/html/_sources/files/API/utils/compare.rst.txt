@@ -1,0 +1,5 @@
+compare
+-----------
+
+.. autoclass:: AutoencoderAPI.utils.compare.compare
+   :members:
