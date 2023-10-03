@@ -1,31 +1,27 @@
 from torch import nn
-from random import choice, sample
-import numpy as np
+from random import sample
+
 import warnings
 from .custom_loss import pytorch_kmeans_silhouette_loss, sklearn_kernelDensity_loss, sklearn_kmeans_silhouette_loss, triplet_MSE
 
-
 class build_criterion:
+    """
+    Definition of the criterion used in the training process.
+    Multiple loss function are evaluated and each require specific inputs.
+    The initialization takes care of the different cases to remove the selection 
+    process of the training loops.
 
+    Parameters
+    ----------
+    config : dict
+        Dictionary containing the experiment parameters. 
+
+    Returns
+    -------
+    None
+    """
     def __init__(self, config):
-        """
-        # criterion
-
-        Definition of the criterion used in the training process.
-        Multiple loss function are evaluated and each require specific inputs.
-        The initialization takes care of the different cases to remove the selection 
-        process of the training loops.
-
-        Parameters
-        ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                See the `main` class for more details on the config dictionary
-
-        Returns
-        -------
-        - None
-        """
+        
         def generic(output_, input_, X, network, list_):
             return self.criterion(output_, input_)
 
@@ -45,9 +41,9 @@ class build_criterion:
             "CrossEntropy"       : (nn.CrossEntropyLoss() , generic),
             "L1Loss"             : (nn.L1Loss() , generic),
             "MSELoss"            : (nn.MSELoss() , generic),
-            "NLLLoss"            : (nn.NLLLoss() , generic),
+            #"NLLLoss"            : (nn.NLLLoss() , generic),
             "HingeEmbeddingLoss" : (nn.HingeEmbeddingLoss() , generic),
-            "MarginRankingLoss"  : (nn.MarginRankingLoss() , generic),
+            #"MarginRankingLoss"  : (nn.MarginRankingLoss() , generic),
             "KLDivLoss"          : (nn.KLDivLoss() , generic),
             "TripletMarginLoss"  : (nn.TripletMarginLoss() , triplet),
             "TripletMSE"         : (triplet_MSE() , custom_without_sample),
@@ -62,31 +58,30 @@ class build_criterion:
             self.criterion = criterion_dict["MSELoss"]
             warnings.warn("No criterion was defined int the configuration dict (was set MSELoss)")
 
-        
         self.lossFunction = crit_type
         
 
     def forward(self, output_, input_, X, param1, param2):
         """
-        # forward
-
         Use the initialized criterion to output the loss of a specific experiment.
 
         Parameters
         ----------
-        - output_ : torch.tensor
-            - Neural network output (reconstruction for autoencoder).
-        - input_ : torch.tensor
-            - Neural network input.
-        - X : torch.tensor
-            - Dataset 
-        - param1 : Any
-            - Depend on criterion type
-        - param2 : Any
-            - Depend on criterion type
+        output_ : torch.tensor
+            Neural network output (reconstruction for autoencoder).
+        input_ : torch.tensor
+            Neural network input.
+        X : torch.tensor
+            Dataset 
+        param1 : Any
+            Depend on criterion type
+        param2 : Any
+            Depend on criterion type
+        
         Returns
         -------
-        - loss : 
+        loss : torch.tensor
+            Loss score 
         """   
         loss = self.lossFunction(output_, input_, X, param1, param2)
 

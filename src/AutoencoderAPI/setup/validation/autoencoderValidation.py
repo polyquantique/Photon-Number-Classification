@@ -3,36 +3,33 @@ import torch
 
 def validation(network, X, criterion, store=False):
     """
-    # validation
-
     Validation or testing.
     This action consists of a forward pass of the network using the desired samples.
     In this step the intermediate results can be stored in a `results` dictionary.
     The results consists of the input, the encoder output and the decoder output.
 
-
     Parameters
     ----------
-    - network : Pytorch sequential : 
-            - Autoencoder neural network that is trained to reproduce its input signal.
-    - X : torch.tensor
-            - Input samples used to validate or test the autoencoder.
-    - criterion : Pytorch criterion
-            - Criterion used for training.
-    - store : bool
-            - If `True` the intermediate results are stored in the `results` dictionary.
+    network : Pytorch sequential : 
+        Autoencoder neural network that is trained to reproduce its input signal.
+    X : torch.tensor
+        Input samples used to validate or test the autoencoder.
+    criterion : Pytorch criterion
+        Criterion used for training.
+    store : bool
+        If `True` the intermediate results are stored in the `results` dictionary.
     
     Returns
     -------
-    - store = `True` : 
-        - Average loss : float
-            - Average loss of the training process (loss of one epoch).
-        - results : dict
-            - Dictionary containing the intermediate results of the process 
-                (input, encoder output and decoder output)
-    - store = `False` : 
-        - Average loss : float
-            - Average loss of the training process (loss of one epoch).
+    store = `True` : 
+        Average loss : float
+            Average loss of the training process (loss of one epoch).
+        results : dict
+            Dictionary containing the intermediate results of the process 
+            (input, encoder output and decoder output)
+    store = `False` : 
+        Average loss : float
+            Average loss of the training process (loss of one epoch).
     """
     cumu_loss = 0
     list_ = range(X.size(0))

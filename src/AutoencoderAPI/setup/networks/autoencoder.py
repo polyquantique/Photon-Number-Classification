@@ -2,32 +2,27 @@ from torch import nn
 
 
 class build_autoencoder(nn.Module):
+    """
+    Build a Pytorch autoencoder architecture with desired caracteristics. 
+
+    Parameters
+    ----------
+    config : dict
+        Dictionary containing the CNN desired caracteristics. 
+
+    Returns
+    -------
+    None
+    """
     def __init__(self, config: dict):
-        """
-        # build_autoencoder
-
-        Build a Pytorch autoencoder architecture with desired caracteristics. 
-
-        Parameters
-        ----------
-        config : dict
-                Dictionary containing the CNN desired caracteristics. 
-                See the `autoencoder` class for more details on the config dictionary
-
-        Returns
-        -------
-        None
-        """
-        super().__init__()
         
-        if config['network']['layer_number'] % 2 != 0:
-            print("Invalid number of layer (needs to be even number)")
+        super().__init__()
 
         # Layer type
-        layer_type_dict = {
-            "Linear" : nn.Linear
-        }
-        layer = layer_type_dict[config['network']['layer_type']]
+        #layer_type_dict = {
+        #    "Linear" : nn.Linear
+        #}
+        #layer = layer_type_dict[config['network']['layer_type']]
 
         # Activation function
         activation_dict = {
@@ -54,53 +49,57 @@ class build_autoencoder(nn.Module):
         skip = config['train']["skip_elements"]
         size = config['files']['input_dimension']
         layer_list = config['network']['layer_list']
+        if skip <= 1 : skip = 1
         layer_list[0] = layer_list[-1] = int(size / skip)
         activation_list = config['network']['activation_list']
+        network_type = config['network']['network_type']
         
         self.encoder = nn.Sequential()
         self.decoder = nn.Sequential()
         
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        
         for index, activation_type in enumerate(activation_list):
             if index < len(activation_list) // 2 + 1:
-                self.encoder.append(layer(layer_list[index], layer_list[index+1]))
+                if network_type == 'CNN':
+                    self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+                self.encoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
                 self.encoder.append(activation_dict[activation_type]())
             else:
-                self.decoder.append(layer(layer_list[index], layer_list[index+1]))
+                self.decoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
+                if network_type == 'CNN':
+                    self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
                 self.decoder.append(activation_dict[activation_type]())
             
-        self.decoder.append(layer(layer_list[-2], layer_list[-1]))
+        self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
 
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-        #self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
 
-    def forward(self, X, encoding=False, decoding=False) -> any:
+    def forward(self, X, encoding=False, decoding=False, both=False) -> any:
         """
-        # forwarde
-
         Forward pass of the autoencoder.
 
         Parameters
         ----------
-        - X : torch.tensor
-            - Input signal of the autoencoder.
-        - encoding : bool
-            - If `True` the forward pass will return the encoder output.
-        - decoding : bool
-            - If `True` the forward pass expects an input X of size equal to 
-                the encoder output and returns the encoder output.
+        X : torch.tensor
+            Input signal of the autoencoder.
+        encoding : bool
+            If `True` the forward pass will return the encoder output.
+        decoding : bool
+            If `True` the forward pass expects an input X of size equal to 
+            the encoder output and returns the encoder output.
 
         Returns
         -------
-        - encoding = `True` (encoder) : torch.tensor
-            - Encoder output (size of the middle layer of the autoencoder)
-        - decoding = `True` (decoder) : torch.tensor
-            - Decoder output (size of the input layer of the autoencoder)
-        - encoding = decoding = `False` : torch.tensor
-            - Autoencoder output (size of the input layer of the autoencoder)
+        both = `True` (encoder, decoder) : torch.tensor
+            Encoder and decoder output.
+        encoding = `True` (encoder) : torch.tensor
+            Encoder output (size of the middle layer of the autoencoder)
+        decoding = `True` (decoder) : torch.tensor
+            Decoder output (size of the input layer of the autoencoder)
+        encoding = decoding = `False` : torch.tensor
+            Autoencoder output (size of the input layer of the autoencoder)
         """
+        if both:
+            encode = self.encoder(X)
+            return encode , self.decoder(encode)
         if encoding:
             return self.encoder(X)
         elif decoding:
