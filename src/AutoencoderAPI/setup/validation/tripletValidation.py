@@ -73,17 +73,7 @@ def validation(alpha, network, X, criterion, cluster_label, store=False):
 
     if store:
         return cumu_loss / len(X), results
-    
+            
     return cumu_loss / len(X)
-            current_label = cluster_label[index]
-            negative_index = torch.where(cluster_label != current_label)[0]
-            rand_index = torch.randint(negative_index.size(0), (1,))
-            negative = X[negative_index[rand_index]]
 
-            loss = criterion.forward(decode, data, _, negative.view(1,-1), alpha)
-            cumu_loss += loss.item()
-
-    if store:
-        return cumu_loss / len(X), results
-    
-    return cumu_loss / len(X)
+        

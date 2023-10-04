@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import argrelextrema
-from bisect import bisect
 from matplotlib.pyplot import cm
 
 from sklearn.neighbors import KernelDensity
@@ -64,14 +63,14 @@ class kernel_density():
         grid = GridSearchCV(KernelDensity(), params).fit(X_low[::skip])
         kd = grid.best_estimator_
 
-        print("Bandwidth : {0}".format(grid.best_estimator_.bandwidth))
+        #print("Bandwidth : {0}".format(grid.best_estimator_.bandwidth))
         
         self.space = np.linspace(min_, max_, 5_000).reshape(-1,1)
         self.density = kd.score_samples(self.space)
         self.mins = self.space[argrelextrema(self.density, np.less)[0]].flatten()
 
         self.labels = np.digitize(X_low, bins=self.mins).reshape(-1)    
-        self.bins = np.linspace(min(X_low), max(X_low), 10_000).reshape(-1)
+        self.bins = np.linspace(min(X_low), max(X_low), 50_000).reshape(-1)
         
         self.clusters_low = []
         self.condition = []
@@ -99,7 +98,7 @@ class kernel_density():
         None
 
         """
-        plt.figure(figsize=(10,4), dpi=100)
+        plt.figure(figsize=(30,4), dpi=200)
         plt.plot(self.space, self.density)
         plt.xlabel("Feature")
         plt.ylabel("Density")
@@ -121,7 +120,7 @@ class kernel_density():
         None
 
         """
-        plt.figure(figsize=(10,4), dpi=100)
+        plt.figure(figsize=(30,4), dpi=200)
         n =len(self.clusters_low)
         color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n))))
         for index_cluster, cluster in enumerate(self.clusters_low):
@@ -131,7 +130,7 @@ class kernel_density():
         plt.ylabel("Counts")
         if xlim != None:
             plt.xlim(xlim[0],xlim[1])
-        plt.legend(ncol=3)
+        #plt.legend(ncol=3)
         plt.show()
 
 
@@ -192,4 +191,4 @@ class kernel_density():
         """
         if self.flip:
             X_low = -1*X_low
-        return np.digitize(X_low, bins=self.mins)#bisect(self.mins, X_low)#np.array([bisect(self.mins, i) for i in X_low])
+        return np.digitize(X_low, bins=self.mins)

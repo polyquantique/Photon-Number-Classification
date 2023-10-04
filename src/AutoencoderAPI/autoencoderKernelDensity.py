@@ -25,7 +25,7 @@ class autoencoder_kernelDensity():
         config_load = open_object(f"{model_path}/log.bin")
         network = build_autoencoder(config_load)
         network.load_state_dict(torch.load(f"{model_path}/model.pt"))
-
+        print(config_load)
         if config_load['train']['skip_elements'] <= 1:
             self.size = config_load['files']['input_dimension']
         else:
@@ -134,7 +134,7 @@ class autoencoder_kernelDensity():
         self.network.eval()
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+            X_low_dim = X_low_dim.detach().numpy().reshape(-1)
 
             if self.flip:
                 X_low_dim = -1 * X_low_dim

@@ -58,7 +58,7 @@ class fileBatch:
         folder = f"{config['files']['dataset']}"
         files = listdir(folder)
 
-        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42)
+        fold = KFold(n_splits=10,shuffle=True,random_state=42) #config['train']['k-fold']
         train_validation_files, test_files = train_test_split(files,train_size=0.9,shuffle=True)
         splits = fold.split(train_validation_files)
 
@@ -263,10 +263,10 @@ class fileBatch:
         - None
         """
         # log path and folder creation to store results
-        if 'sweep' not in config.items():
-            config['internal'] = {}
-            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        #if 'sweep' not in config.items():
+        config['internal'] = {}
+        folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+        log_path = f"{config['files']['path_save']}/run-{folder_name}"
             
         config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

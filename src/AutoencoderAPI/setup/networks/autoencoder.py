@@ -68,8 +68,10 @@ class build_autoencoder(nn.Module):
                 if network_type == 'CNN':
                     self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
                 self.decoder.append(activation_dict[activation_type]())
-            
+        
         self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
+        print(self.encoder)
+        print(self.decoder)
 
 
     def forward(self, X, encoding=False, decoding=False, both=False) -> any:
