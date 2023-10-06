@@ -70,8 +70,8 @@ class build_autoencoder(nn.Module):
                 self.decoder.append(activation_dict[activation_type]())
         
         self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
-        print(self.encoder)
-        print(self.decoder)
+        #print(self.encoder)
+        #print(self.decoder)
 
 
     def forward(self, X, encoding=False, decoding=False, both=False) -> any:

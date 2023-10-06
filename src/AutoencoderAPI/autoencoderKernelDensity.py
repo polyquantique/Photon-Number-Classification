@@ -94,13 +94,7 @@ class autoencoder_kernelDensity():
 
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
-        if flip:
-            self.flip = True
-            X_low_dim = -1 * X_low_dim
-        else:
-            self.flip = False
-
-        kd = kernel_density(X_low_dim, bw_cst, skip)
+        kd = kernel_density(X_low_dim, bw_cst, skip, flip)
             
         if plot_density:
             kd.plot_density()
@@ -136,9 +130,6 @@ class autoencoder_kernelDensity():
             X_low_dim = self.network(X_pytorch, encoding=True)
             X_low_dim = X_low_dim.detach().numpy().reshape(-1)
 
-            if self.flip:
-                X_low_dim = -1 * X_low_dim
-
         return self.fit_(X_low_dim)
 
     
@@ -167,9 +158,6 @@ class autoencoder_kernelDensity():
             
             X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
-
-            if self.flip:
-                X_low_dim = -1 * X_low_dim
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
             labels = self.fit_(X_low_dim)

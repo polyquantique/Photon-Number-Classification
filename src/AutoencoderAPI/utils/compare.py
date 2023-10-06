@@ -8,10 +8,6 @@ from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bo
 
 from AutoencoderAPI.utils.kernelDensity import kernel_density
 
-
-import warnings
-warnings.filterwarnings("ignore")
-
 class compare():
 
     def __init__(self, bw = (-5, -2, 20)):
@@ -284,10 +280,9 @@ class compare():
         metric_list = self.metric_list
         scores = np.zeros((len(metric_list), len(X_init), max_number_cluster))
 
+        for index_samples, X_init_it in tqdm(enumerate(X_init), total=len(X_init)):
 
-        for index_samples, X_init_it in enumerate(X_init):
-
-            self.kd = kernel_density(X_low_dim[index_samples], self.bw)
+            self.kd = kernel_density(X_low_dim[index_samples], [self.bw[index_samples]])
             labels = self.kd.labels
             length = len(self.kd.clusters_low)
 

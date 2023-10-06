@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import jax.numpy as jnp
 from scipy.signal import argrelextrema
 from matplotlib.pyplot import cm
 
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
 
-
+from fastkde import fastKDE
 
 class kernel_density():
     """
@@ -64,13 +65,13 @@ class kernel_density():
         kd = grid.best_estimator_
 
         #print("Bandwidth : {0}".format(grid.best_estimator_.bandwidth))
-        
-        self.space = np.linspace(min_, max_, 5_000).reshape(-1,1)
+        number_bins = int(1/bw[0] * 500)
+        self.space = np.linspace(min_, max_, number_bins).reshape(-1,1)
         self.density = kd.score_samples(self.space)
         self.mins = self.space[argrelextrema(self.density, np.less)[0]].flatten()
 
-        self.labels = np.digitize(X_low, bins=self.mins).reshape(-1)    
-        self.bins = np.linspace(min(X_low), max(X_low), 50_000).reshape(-1)
+        self.labels = np.searchsorted(v=X_low, a=self.mins).reshape(-1)    
+        self.bins = np.linspace(min(X_low), max(X_low), number_bins).reshape(-1)
         
         self.clusters_low = []
         self.condition = []
@@ -98,7 +99,7 @@ class kernel_density():
         None
 
         """
-        plt.figure(figsize=(30,4), dpi=200)
+        plt.figure(figsize=(10,4), dpi=100)
         plt.plot(self.space, self.density)
         plt.xlabel("Feature")
         plt.ylabel("Density")
@@ -120,7 +121,7 @@ class kernel_density():
         None
 
         """
-        plt.figure(figsize=(30,4), dpi=200)
+        plt.figure(figsize=(10,4), dpi=100)
         n =len(self.clusters_low)
         color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n))))
         for index_cluster, cluster in enumerate(self.clusters_low):
@@ -191,4 +192,4 @@ class kernel_density():
         """
         if self.flip:
             X_low = -1*X_low
-        return np.digitize(X_low, bins=self.mins)
+        return np.searchsorted(v=X_low, a=self.mins)

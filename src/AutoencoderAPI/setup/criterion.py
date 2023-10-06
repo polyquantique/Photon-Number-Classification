@@ -2,7 +2,7 @@ from torch import nn
 from random import sample
 
 import warnings
-from .custom_loss import pytorch_kmeans_silhouette_loss, sklearn_kernelDensity_loss, sklearn_kmeans_silhouette_loss, triplet_MSE
+from .custom_loss import *
 
 class build_criterion:
     """
@@ -29,7 +29,7 @@ class build_criterion:
             return self.criterion(input_, output_, negative)
 
         def custom_with_sample(output_, input_, X, network, list_):
-            X_sub = X[sample(list_, 10_000)]
+            X_sub = X[sample(list_, 1_000)]
             crit = self.criterion
             return crit.forward(output_, input_, network, X_sub)
         
@@ -49,7 +49,8 @@ class build_criterion:
             "TripletMSE"         : (triplet_MSE() , custom_without_sample),
             "pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),
             "sklearn_kernelDensity_loss"      : (sklearn_kernelDensity_loss() , custom_with_sample),
-            "sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample)
+            "sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),
+            "trustworthinessLoss" : (trustworthinessLoss(), custom_with_sample)
         }
 
         try:

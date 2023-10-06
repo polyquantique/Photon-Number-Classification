@@ -263,10 +263,12 @@ class fileBatch:
         - None
         """
         # log path and folder creation to store results
-        #if 'sweep' not in config.items():
-        config['internal'] = {}
-        folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-        log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        if 'sweep' not in config.items():
+            config['internal'] = {}
+            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        else:
+            log_path = f"{config['files']['path_save']}"
             
         config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

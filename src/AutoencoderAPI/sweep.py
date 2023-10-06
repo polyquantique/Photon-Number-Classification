@@ -55,7 +55,7 @@ class sweep:
 
 
     
-    def random_search(self,run_config, sweep_config, sweep_number):
+    def random_search(self, run_config, sweep_config, sweep_number):
         """
         TODO
         update to current structure
@@ -71,8 +71,9 @@ class sweep:
         for index in range(sweep_number):
 
             if ('network','layer_size_possibility') in sweep_config['search_param']:
-                layer_list = choices(run_config['sweep']['layer_size_possibility'], k = layer_number // 2)                
-                run_config['run']['layer_list'] = layer_list + [1] + list(reversed(layer_list))[1:]
+                layer_list = choices(sweep_config['layer_size_possibility'], k = layer_number // 2)                
+                run_config['network']['layer_list'] = layer_list + [1] + list(reversed(layer_list))
+                print(run_config['network']['layer_list'])
 
             for (category, parameter) in sweep_config['search_param']:
 
