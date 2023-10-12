@@ -34,15 +34,17 @@ class autoencoder_kernelDensity():
         self.network = network
         self.config_load = config_load
         self.fit_ = None
-        self.flip = False
         
     
     def fit(self, X, 
                 plot_density = False, 
                 plot_cluster = False, 
-                plot_traces = False, 
+                plot_traces = False,
+                plot_traces_average = False, 
                 bw_cst = (-5, -2, 20), 
                 flip = False,
+                filter_input = False,
+                filter_threshold = 0.0005,
                 cluster_xlim = None,
                 traces_xlim = None,
                 skip = 1):
@@ -90,9 +92,22 @@ class autoencoder_kernelDensity():
         self.network.eval()
         with torch.no_grad():
             X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
-            X_low_dim = self.network(X_pytorch, encoding=True)
+            
 
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+            if filter_input:
+                X_low_dim, X_reconst = self.network(X_pytorch, both=True)
+            
+                X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
+                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+
+                MSE = ((X - X_reconst)**2).mean(axis=1)
+                condition = MSE < filter_threshold
+
+                X_low_dim = X_low_dim[condition]
+                X = X[condition]
+            else:
+                X_low_dim = self.network(X_pytorch, encoding=True)
+                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
         kd = kernel_density(X_low_dim, bw_cst, skip, flip)
             
@@ -102,6 +117,8 @@ class autoencoder_kernelDensity():
             kd.plot_cluster(cluster_xlim)
         if plot_traces:
             kd.plot_traces(X, traces_xlim)
+        if plot_traces_average:
+            kd.plot_traces_average(X, traces_xlim)
 
         self.fit_ = kd.fit
 
