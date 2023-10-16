@@ -93,3 +93,23 @@ class triplet_MSE:
         MSE = mse(output_, input_)
 
         return alpha * triplet + MSE
+    
+
+from sklearn.manifold import trustworthiness
+import torch
+
+class trustworthinessLoss:
+
+    def __init__(self):
+        pass
+
+    def forward(self, input_, output_, network, X):
+
+        latent = network(X, encoding=True).detach().numpy().reshape(-1,1)
+        X_init = X.detach().numpy().reshape(-1,X.size(2))
+        t = trustworthiness(X_init, latent, metric="euclidean")
+
+        mse = nn.MSELoss()
+        MSE = mse(output_, input_)
+        
+        return 1/t + MSE

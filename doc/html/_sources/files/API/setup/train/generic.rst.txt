@@ -1,0 +1,5 @@
+generic
+-------
+
+.. autoclass:: AutoencoderAPI.setup.train.generic.train
+   :members:

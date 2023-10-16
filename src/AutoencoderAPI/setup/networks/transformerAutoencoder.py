@@ -5,25 +5,24 @@ from .transformer.transformerDecoderLayer import transformerDecoderLayer
 
 
 class build_autoencoder(nn.Module):
+    """
+    Build a Pytorch transformer autoencoder based on :
+
+    [1] R. Ran, T. Gao, and B. Fang, ‘Transformer-based dimensionality reduction’. 
+    arXiv, Oct. 15, 2022. Accessed: Jul. 17, 2023. [Online]. Available: http://arxiv.org/abs/2210.08288
+
+    Parameters
+    ----------
+    config : dict
+        Dictionary containing the CNN desired caracteristics. 
+        See the `autoencoder` class for more details on the config dictionary
+
+    Returns
+    -------
+    None
+    """
     def __init__(self, config: dict) -> None:
-        """
-        # build_autoencoder
-
-        Build a Pytorch transformer autoencoder based on :
-
-        [1] R. Ran, T. Gao, and B. Fang, ‘Transformer-based dimensionality reduction’. 
-        arXiv, Oct. 15, 2022. Accessed: Jul. 17, 2023. [Online]. Available: http://arxiv.org/abs/2210.08288
-
-        Parameters
-        ----------
-        config : dict
-                Dictionary containing the CNN desired caracteristics. 
-                See the `autoencoder` class for more details on the config dictionary
-
-        Returns
-        -------
-        None
-        """
+        
         super().__init__()
 
         self.embed_dim = config['network']["embed_dim"]
@@ -39,28 +38,26 @@ class build_autoencoder(nn.Module):
 
     def forward(self, X, encoding=False, decoding=False):
         """
-        # forwarde
-
         Forward pass of the autoencoder.
 
         Parameters
         ----------
-        - X : torch.tensor
-            - Input signal of the autoencoder.
-        - encoding : bool
-            - If `True` the forward pass will return the encoder output.
-        - decoding : bool
-            - If `True` the forward pass expects an input X of size equal to 
-              the encoder output and returns the encoder output.
+        X : torch.tensor
+            Input signal of the autoencoder.
+        encoding : bool
+            If `True` the forward pass will return the encoder output.
+        decoding : bool
+            If `True` the forward pass expects an input X of size equal to 
+            the encoder output and returns the encoder output.
 
         Returns
         -------
-        - encoding = `True` (encoder) : torch.tensor
-            - Encoder output (size of the middle layer of the autoencoder)
-        - decoding = `True` (decoder) : torch.tensor
-            - Decoder output (size of the input layer of the autoencoder)
-        - encoding = decoding = `False` : torch.tensor
-            - Autoencoder output (size of the input layer of the autoencoder)
+        encoding = `True` (encoder) : torch.tensor
+            Encoder output (size of the middle layer of the autoencoder)
+        decoding = `True` (decoder) : torch.tensor
+            Decoder output (size of the input layer of the autoencoder)
+        encoding = decoding = `False` : torch.tensor
+            Autoencoder output (size of the input layer of the autoencoder)
         """
         if encoding:
             X = X.view(1, self.sequence, self.embed_dim)

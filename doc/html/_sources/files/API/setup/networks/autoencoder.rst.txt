@@ -1,0 +1,5 @@
+autoencoder
+-----------
+
+.. autoclass:: AutoencoderAPI.setup.networks.autoencoder.build_autoencoder
+   :members:

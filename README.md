@@ -1,7 +1,7 @@
 
-# SINGLE PHOTON DETECTION
+# PHOTON NUMBER CLASSIFICATION
 
-Comparison of different algorithms for classification of transition edge sensor traces for photon number state detection.
+Comparison of different algorithms for classification of transition edge sensor signals for photon number state detection.
 With the development of a variety of techniques in the field of A.I. the goal is to quantify the advantages of modern classification techniques 
 in the context of photon detection. 
 
@@ -41,24 +41,22 @@ Neural networks allow for a wide variety of architectures and therefore their ev
 ## TODO
 
 - Pytorch dataset classs structure for batching and true random.
-- Random sweep for NN architecture based on current file structure.
 
 ## ACKNOWLEDGMENTS
 
+We thank the Ministère de l'Économie et de l’Innovation du Québec and the Natural Sciences and Engineering Research Council of Canada for their financial support.
 
+We acknowledge the help of NIST and Guillaume Thekkadath who provided the datasets used in this work.
 
 ## REFERENCES
 
-[1] Y. Zhang, Q. Shang, and G. Zhang, ‘pyDRMetrics - A Python toolkit for dimensionality reduction quality assessment’, Heliyon, vol. 7, no. 2, p. e06199, Feb. 2021, doi: 10.1016/j.heliyon.2021.e06199.
+[1] T. Gerrits, B. Calkins, N. Tomlin, A. E. Lita, A. Migdall, R. Mirin, and S. W. Nam, “Extending single-photon optimized superconducting transition edge sensors beyond the single-photon counting regime,” Optics Express, vol. 20, no. 21, pp. 23 798–23 810, Oct. 2012.
 
 
-[2] R. Ran, T. Gao, and B. Fang, ‘Transformer-based dimensionality reduction’. arXiv, Oct. 15, 2022. Accessed: Jul. 17, 2023. [Online]. Available: http://arxiv.org/abs/2210.08288
+[2] G. S. Thekkadath, “Preparing and characterizing quantum states of light using photon-number-resolving detectors.”
 
 
-[3] ‘MultiheadAttention — PyTorch 2.0 documentation’. https://pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention.html (accessed Sep. 01, 2023).
-
-
-[4] Y. Ichinohe et al., ‘Application of Deep Learning to the Evaluation of Goodness in the Waveform Processing of Transition-Edge Sensor Calorimeters’, J Low Temp Phys, vol. 209, no. 5, pp. 1008–1016, Dec. 2022, doi: 10.1007/s10909-022-02719-7.
+[3] Y. Ichinohe et al., ‘Application of Deep Learning to the Evaluation of Goodness in the Waveform Processing of Transition-Edge Sensor Calorimeters’, J Low Temp Phys, vol. 209, no. 5, pp. 1008–1016, Dec. 2022, doi: 10.1007/s10909-022-02719-7.
 
 
 

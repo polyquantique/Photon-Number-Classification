@@ -1,0 +1,5 @@
+tripletValidation
+-----------------
+
+.. autoclass:: AutoencoderAPI.setup.validation.tripletValidation.validation
+   :members:

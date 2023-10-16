@@ -2,97 +2,69 @@ import matplotlib.pyplot as plt
 import numpy as np
 from os import listdir
 from .files import open_object
-from matplotlib import colors
 import warnings
+
+from .kernelDensity import kernel_density
+
 warnings.filterwarnings("ignore")
 plt.style.use('seaborn-pastel')
 
-# Class specific import
-def plot_hist(X, xlabel=None, ylabel=None, bins=700):
-
-    plt.figure()
-    plt.hist(X, bins=bins)
-    if xlabel is not None:
-        plt.xlabel(xlabel)
-    if ylabel is not None:
-        plt.ylabel(ylabel)
-    plt.show()
-
-
-# Class specific import
-from .metrics import silhouette_kmean
-
-def load_run_results(file_name, min_cluster, max_cluster):
+def load_run_results(file_name, bw = (-5, -2, 20)):
     """
-    # load_run_results
-
-    Load a 'run' folder to plot the dimensionality reduction output, the losses, an input compared 
-    to the autoencoder output and the Silhouette score of K-means clustering for multiple cluster numbers. 
+    Load a `run` folder to plot the dimensionality reduction output, the losses, an input compared 
+    to the autoencoder output and cluster labelling using kernel density estimation . 
 
     Parameters
     ----------
-    - file_name : str
-            - Name of the file or path to file inside the `Autoencoder Log` folder.
-    
+    file_name : str
+        Name of the file or path to file inside the `Autoencoder Log` folder.
+    bw : tuple or numpy.array
+        If bw is a tuple, it represents the parameters inside np.logspace(\*bw).
+        Otherwise, an array can be used, this represents an array containing all 
+        the possible bandwidth used in the kernel density estimation.
     Returns
     -------
-    - None
+    None
     """
     path = f"{file_name}"
     
     for index_fold, fold in enumerate(listdir(path)):
 
-        fig, axs = plt.subplots(2,2,figsize=(15,10))
+        fig, axs = plt.subplots(3,1,figsize=(10,10))
 
         results = open_object(f"{path}/{fold}/results.bin")
 
-        sk = silhouette_kmean(results['encode'], min_cluster, max_cluster)
-        scores = sk.scores 
-        optimal_cluster = sk.optimal_cluster
-        optimal_score = sk.optimal_score
-        clusters = sk.clusters
-        print(f"Optimal number of clusters : {optimal_cluster}")
-        
+        kd = kernel_density(np.array(results['encode']), bw)
+        clusters = kd.clusters_low
         bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).flatten()
 
         for index_cluster, cluster in enumerate(clusters):
-            axs[0,0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
-        axs[0,0].set_xlabel("feature")
-        axs[0,0].set_ylabel("counts")
-        axs[0,0].legend(ncol=3)
+            axs[0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
+        axs[0].set_xlabel("feature")
+        axs[0].set_ylabel("counts")
+        axs[0].legend(ncol=3)
             
-        axs[1,0].plot(range(min_cluster, max_cluster+1), scores, label="Approx Silhouette")
-        axs[1,0].hlines(optimal_score, min_cluster+1, max_cluster+1, linestyles='dashed', label="Final Silhouette")
-        axs[1,0].set_ylabel("Clustering score")
-        axs[1,0].set_xlabel("Number of cluster")
-        axs[1,0].legend()
-
-        axs[1,1].plot(results['decode'][1],label=f"Autoencoder output {index_fold}")
-        axs[1,1].plot(results['input'][1],label=f"Autoencoder input {index_fold}")
-        axs[1,1].set_ylabel("Normalized voltage")
-        axs[1,1].set_xlabel("element")
-        axs[1,1].legend()
+        axs[2].plot(results['input'][1],label=f"Autoencoder input {index_fold}")
+        axs[2].plot(results['decode'][1],label=f"Autoencoder output {index_fold}")
+        axs[2].set_ylabel("Normalized voltage")
+        axs[2].set_xlabel("element")
+        axs[2].legend()
 
         loss = open_object(f"{path}/{fold}/loss.bin")
 
-        axs[0,1].plot(loss['train_loss'],label=f"Train {index_fold}")
-        axs[0,1].plot(loss['validation_loss'],label=f"Validation {index_fold}")
-        axs[0,1].hlines(loss['test_loss'], 0, len(loss['validation_loss'])-1, linestyles='dashed',label = f"Test {index_fold}")
-        axs[0,1].legend()
-        axs[0,1].set_ylabel("loss")
-        axs[0,1].set_xlabel("epoch")
-
-    #config_file = open_object(f"{path}/{fold}/log.bin")
-    #print("Activation list : ", config_file['network']['activation_list'])
-    #print("Layer list : ", config_file['network']['layer_list'])
-    print("Optimal Silhouette score : ", optimal_score)
+        axs[1].plot(loss['train_loss'],label=f"Train {index_fold}")
+        axs[1].plot(loss['validation_loss'],label=f"Validation {index_fold}")
+        axs[1].hlines(loss['test_loss'], 0, len(loss['validation_loss'])-1, linestyles='dashed',label = f"Test {index_fold}")
+        axs[1].legend()
+        axs[1].set_ylabel("loss")
+        axs[1].set_xlabel("epoch")
 
 
-# Class specific import
 
-def load_sweep_results(file_name, parameters : tuple):
+def load_sweep_results(file_name, parameters):
     """
-    # load_sweep_results
+    TODO
+    adapt to new sweep structure
 
     load_sweep_results(file_name, parameters)
 

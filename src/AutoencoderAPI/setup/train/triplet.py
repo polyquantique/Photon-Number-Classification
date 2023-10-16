@@ -3,8 +3,6 @@ import torch
 
 def train(config, network, X, optimizer, criterion, cluster_label):
         """
-        # train
-
         Training process executed for every epoch. The actions consists of setting the gradients to zero, 
         making predictions for the batch, computing the loss and its gradient and updating the weights and biases.
 
@@ -12,23 +10,23 @@ def train(config, network, X, optimizer, criterion, cluster_label):
 
         Parameters
         ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-        - network : Pytorch sequential : 
-                - Autoencoder neural network that is trained to reproduce its input signal.
-        - X : torch.tensor
-                - Input samples used to train the autoencoder.
-        - optimizer : Pytorch optimizer
-                - Optimizer used for training.
-        - criterion : Pytorch criterion
-                - Criterion used for training.
-        - cluster_label : torch.tensor
-                - Cluster labels for every element in X.
+        config : dict
+                Dictionary containing the experiment parameters. 
+        network : Pytorch sequential : 
+                Autoencoder neural network that is trained to reproduce its input signal.
+        X : torch.tensor
+                Input samples used to train the autoencoder.
+        optimizer : Pytorch optimizer
+                Optimizer used for training.
+        criterion : Pytorch criterion
+                Criterion used for training.
+        cluster_label : torch.tensor
+                Cluster labels for every element in X.
 
         Returns
         -------
-        - Average loss : float
-                - Average loss of the training process (loss of one epoch).
+        Average loss : float
+                Average loss of the training process (loss of one epoch).
         """
         cumu_loss = 0
         _ = None

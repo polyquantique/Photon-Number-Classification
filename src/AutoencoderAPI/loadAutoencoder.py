@@ -5,7 +5,7 @@ import numpy as np
 from .utils.files import open_object
 from .setup.networks.autoencoder import build_autoencoder
 
-def loadAutoencoder(X_init, model_path, filter=False, threshold=0.0005):
+def loadAutoencoder(X_init, model_path, filter=False, threshold=0.0005, flip=False):
     """
     # loadAutoencoder
 
@@ -48,5 +48,8 @@ def loadAutoencoder(X_init, model_path, filter=False, threshold=0.0005):
     X_reconst = X_reconst.detach().numpy().reshape(-1, config_load['files']['input_dimension'])
 
     X_low_dim = (X_low_dim - np.min(X_low_dim)) / (np.max(X_low_dim) - np.min(X_low_dim))
+
+    if flip:
+        X_low_dim = -1*X_low_dim
 
     return X_init, X_reconst, X_low_dim

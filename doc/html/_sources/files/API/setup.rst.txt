@@ -1,0 +1,12 @@
+setup
+=====
+
+.. toctree::
+   :maxdepth: 2
+   :caption: setup:
+
+   setup/criterion
+   setup/optimizer
+   setup/networks
+   setup/train
+   setup/validation

@@ -12,6 +12,7 @@ import warnings
 from .setup.networks.autoencoder import build_autoencoder 
 from .setup.optimizer import build_optimizer
 from .setup.criterion import build_criterion
+from .setup.validation.autoencoderValidation import validation
 from .utils.files import save_all
 
 
@@ -29,39 +30,36 @@ class fileBatch:
 
     def custom_Kfold(self, config):
         """
-        # custom_Kfold
-
         Create a K-fold cross validation set up by creating a list of training, validation and test files.
         The test files are meant to be used to test the model after the training and validation steps.
-        The test files stay the same accross the K folds. 
+        The test files stay the same across the K folds. 
         The training and validation are defined to create K folds and each fold can be separated into batches.
 
         Parameters
         ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary
+        config : dict
+            Dictionary containing the experiment parameters. 
 
         Returns
         -------
-        - train_files : list
-            - List of numpy arrays containing the name of the training files used in the batches and folds.
-              The list is organised so each element of the list is associated to a fold and the every sub array 
-              is a batch.
-        - validation_files : list
-            - List of numpy arrays containing the name of the validation files used in the batches and folds.
-              The list is organised so each element of the list is associated to a fold and the every sub array 
-              is a batch.
-        - test_files : list
-            - List containing all the test files.
-        - config : dict
-            - Updated dictionary. Define `input_dimension` of the autoencoder
+        train_files : list
+            List of numpy arrays containing the name of the training files used in the batches and folds.
+            The list is organised so each element of the list is associated to a fold and the every sub array 
+            is a batch.
+        validation_files : list
+            List of numpy arrays containing the name of the validation files used in the batches and folds.
+            The list is organised so each element of the list is associated to a fold and the every sub array 
+            is a batch.
+        test_files : list
+            List containing all the test files.
+        config : dict
+            Updated dictionary. Define `input_dimension` of the autoencoder
         """
         folder = f"{config['files']['dataset']}"
         files = listdir(folder)
 
-        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42)
-        train_validation_files, test_files = train_test_split(files,train_size=0.8,shuffle=True)
+        fold = KFold(n_splits=10,shuffle=True,random_state=42) #config['train']['k-fold']
+        train_validation_files, test_files = train_test_split(files,train_size=0.9,shuffle=True)
         splits = fold.split(train_validation_files)
 
         train_files = []
@@ -86,29 +84,28 @@ class fileBatch:
         validation_files = [np.array_split(validation_fold, validation_batch_number) for validation_fold in validation_files]
 
         return train_files, validation_files, test_files, config
+
     
 
     def custom_dataloader(self, config, files):
         """
-        # custom_dataloader
 
-        Creates a pytorch tensor containing all the batch samples of a specific fold.
+        Creates a Pytorch tensor containing all the batch samples of a specific fold.
 
         Parameters
         ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary
-        - files : list
-                - List of files used in the batch. 
-                  All the samples inside the files will be stored as a pytorch tensor.
-                  To reduce the memory requirements increase the batch number in the configuration dictionary.
+        config : dict
+                Dictionary containing the experiment parameters. 
+        files : list
+                List of files used in the batch. 
+                All the samples inside the files will be stored as a Pytorch tensor.
+                To reduce the memory requirements increase the batch number in the configuration dictionary.
 
         Returns
         -------
-        - samples : torch.tensor
-            - Three dimensional tensor containing the batch samples.
-              Tensor of shape (N,0,S), where N is the number of sample and S is the size of each sample.    
+        samples : torch.tensor
+                Three-dimensional tensors containing the batch samples.
+                Tensor of shape (N,0,S), where N is the number of samples and S is the size of each sample.    
         """
         skip = config['train']["skip_elements"]
         folder = f"{config['files']['dataset']}"
@@ -117,37 +114,37 @@ class fileBatch:
         TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
 
         if skip > 1: TES = TES[:, 1::skip]
+        else : skip = 1
 
         np.random.shuffle(TES)
 
         return torch.from_numpy(TES).view(-1, 1, int(size / skip)).float()
+
         
 
     def train_epoch(self, config, network, X_train, optimizer, criterion):
         """
-        # train_epoch
 
-        Training process executed for every epoch. The actions consists of setting the gradients to zero, 
+        Training process executed for every epoch. The action consists of setting the gradients to zero, 
         making predictions for the batch, computing the loss and its gradient and updating the weights and biases.
 
         Parameters
         ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary
-        - network : Pytorch sequential : 
-                - Autoencoder neural network that is trained to reproduce its input signal.
-        - X_train : torch.tensor
-                - Input samples used to train the autoencoder.
-        - optimizer : Pytorch optimizer
-                - Optimizer used for training.
-        - criterion : Pytorch criterion
-                - Criterion used for training.
+        config : dict
+                Dictionary containing the experiment parameters. 
+        network : Pytorch sequential : 
+                Autoencoder neural network that is trained to reproduce its input signal.
+        X_train : torch.tensor
+                Input samples used to train the autoencoder.
+        optimizer : Pytorch optimizer
+                Optimizer used for training.
+        criterion : Pytorch criterion
+                Criterion used for training.
         
         Returns
         -------
-        - Average loss : float
-                - Average loss of the training process (loss of one epoch).
+        Average loss : float
+                Average loss of the training process (loss of one epoch).
         """
         cumu_loss = 0
         network.train()
@@ -168,43 +165,42 @@ class fileBatch:
             cumu_loss += loss.item()
 
         return cumu_loss, len(X_train)
+
     
 
     def validation_test(self, config, network, X, criterion, store=False):
         """
-        # validation_test
 
         Validation or testing of the network.
         This action consists of a forward pass of the network using the desired samples.
         In this step the intermediate results can be stored in a `results` dictionary.
-        The results consists of the input, the encoder output and the decoder output.
+        The result consists of the input, the encoder output and the decoder output.
 
 
         Parameters
         ----------
-        - config : dict
-                - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary.
-        - network : Pytorch sequential : 
-                - Autoencoder neural network that is trained to reproduce its input signal.
-        - X : torch.tensor
-                - Input samples used to validate or test the autoencoder.
-        - criterion : Pytorch criterion
-                - Criterion used for training.
-        - store : bool
-                - If `True` the intermediate results are stored in the `results` dictionary.
+        config : dict
+                Dictionary containing the experiment parameters. 
+        network : Pytorch sequential : 
+                Autoencoder neural network that is trained to reproduce its input signal.
+        X : torch.tensor
+                Input samples used to validate or test the autoencoder.
+        criterion : Pytorch criterion
+                Criterion used for training.
+        store : bool
+                If `True` the intermediate results are stored in the `results` dictionary.
         
         Returns
         -------
-        - store = `True` : 
-            - Average loss : float
-                - Average loss of the training process (loss of one epoch).
-            - results : dict
-                - Dictionary containing the intermediate results of the process 
-                  (input, encoder output and decoder output)
-        - store = `False` : 
-            - Average loss : float
-                - Average loss of the training process (loss of one epoch).
+        store = `True` : 
+            Average loss : float
+                Average loss of the training process (loss of one epoch).
+            results : dict
+                Dictionary containing the intermediate results of the process 
+                (input, encoder output and decoder output)
+        store = `False` : 
+            Average loss : float
+                Average loss of the training process (loss of one epoch).
         """
         cumu_loss = 0
         list_ = range(X.size(0))
@@ -243,6 +239,7 @@ class fileBatch:
             return cumu_loss / len(X), results
         
         return cumu_loss, len(X)
+
     
 
 
@@ -250,9 +247,7 @@ class fileBatch:
 
     def run(self, config):
         """
-        # run
-
-        Execute a neural network experiment by creating an autoencoder neural network and training it to reproduce the it's input signal.
+        Execute a neural network experiment by creating an autoencoder neural network and training it to reproduce its input signal.
         Once it is trained, the encoder portion is used to associate each signal to a singular value. 
         This way, the network acts as a dimensionality reduction technique.
 
@@ -262,7 +257,6 @@ class fileBatch:
                 - Pytorch neural network class with a `__init__` definition and `forward` process.
         - config : dict
                 - Dictionary containing the experiment parameters. 
-                  See the `autoencoder` class for more details on the config dictionary.
         
         Returns
         -------
@@ -273,10 +267,9 @@ class fileBatch:
             config['internal'] = {}
             folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
             log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        else:
+            log_path = f"{config['files']['path_save']}"
             
-
-        #log_path = f"{config['files']['path_save']}/{config['sweep']['sweep_name']}/sweep {str(config['internal']['sweep_index']).rjust(config['internal']['number_size'], '0')}"
-
         config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         train_files, validation_files, test_files, config = self.custom_Kfold(config)
@@ -289,7 +282,7 @@ class fileBatch:
                     'test_loss'         : [],
                     'average_test_loss' : []
                     }
-        
+   
             network = build_autoencoder(config).float().to(config['internal']['device'])
             optimizer = build_optimizer(network, config)
             criterion = build_criterion(config)
@@ -324,15 +317,3 @@ class fileBatch:
             fold_path = f"{log_path}/fold {fold_index}"
             makedirs(fold_path)
             save_all(fold_path, network, results, loss, config)
-
-
-
-    
-
-        
-
-    
-
-
-
-    

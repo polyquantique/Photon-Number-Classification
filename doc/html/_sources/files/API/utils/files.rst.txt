@@ -1,0 +1,13 @@
+files
+-----
+
+.. autoclass:: AutoencoderAPI.utils.files.open_object
+   :members:
+
+
+.. autoclass:: AutoencoderAPI.utils.files.save_object
+   :members:
+
+
+.. autoclass:: AutoencoderAPI.utils.files.save_all
+   :members:

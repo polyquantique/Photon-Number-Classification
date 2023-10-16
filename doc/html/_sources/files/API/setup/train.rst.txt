@@ -1,0 +1,9 @@
+train
+-----
+
+.. toctree::
+   :maxdepth: 2
+   :caption: train:
+
+   train/generic
+   train/triplet
