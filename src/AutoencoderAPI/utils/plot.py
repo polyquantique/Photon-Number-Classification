@@ -4,10 +4,9 @@ from os import listdir
 from .files import open_object
 import warnings
 
-from .kernelDensity import kernel_density
+from .clustering.kernelDensity import kernel_density
 
 warnings.filterwarnings("ignore")
-plt.style.use('seaborn-pastel')
 
 def load_run_results(file_name, bw = (-5, -2, 20)):
     """

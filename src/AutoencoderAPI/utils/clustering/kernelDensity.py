@@ -1,15 +1,11 @@
 import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
-import jax.numpy as jnp
+import torch
 from scipy.signal import argrelextrema
 from matplotlib.pyplot import cm
 
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
-
-from fastkde import fastKDE
-plt.style.use('seaborn-pastel')
 
 class kernel_density():
     """
@@ -70,7 +66,7 @@ class kernel_density():
         number_bins = int(1/bw[0] * 50)
         self.space = np.linspace(min_, max_, number_bins).reshape(-1,1)
         self.density = kd.score_samples(self.space)
-        self.mins = self.space[argrelextrema(self.density, np.less)[0]].flatten()
+        self.mins = torch.tensor(self.space[argrelextrema(self.density, np.less)[0]].flatten())
 
         self.labels = np.searchsorted(v=X_low, a=self.mins).reshape(-1)    
         self.bins = np.linspace(min(X_low), max(X_low), number_bins).reshape(-1)
@@ -109,8 +105,6 @@ class kernel_density():
         #plt.savefig('density.svg',format="svg", transparent=True)
 
 
-
-
     def plot_cluster(self, xlim=None):
         """
         Plot a histogram of the samples in the latent space.
@@ -139,7 +133,6 @@ class kernel_density():
         plt.legend(ncol=3)
         #plt.show()
         #plt.savefig('cluster.svg',format="svg", transparent=True)
-
 
 
     def plot_traces(self, X, xlim=None):
@@ -235,4 +228,4 @@ class kernel_density():
         """
         if self.flip:
             X_low = -1*X_low
-        return np.searchsorted(v=X_low, a=self.mins)
+        return torch.searchsorted(self.mins, X_low).flatten()

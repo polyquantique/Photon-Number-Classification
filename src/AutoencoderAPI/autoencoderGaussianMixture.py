@@ -1,14 +1,16 @@
 import torch
+import numpy as np
 
 from .utils.files import open_object
-from .utils.clustering.kernelDensity import kernel_density
+from .utils.clustering.silhouetteGaussianMixture import silhouette_gaussianMixture
+from .utils.clustering.densityGaussianMixture import density_gaussianMixture
 from .setup.networks.autoencoder import build_autoencoder
 
 
-class autoencoder_kernelDensity():
+class autoencoder_gaussianMixture():
     """
     Load an autoencoder model for dimensionality reduction.
-    The feature space is separated for labelling using kernel density estimation.
+    The feature space is separated for labelling using Gaussian mixture.
 
     Parameters
     ----------
@@ -33,21 +35,20 @@ class autoencoder_kernelDensity():
 
         self.network = network
         self.config_load = config_load
-        self.fit_ = None
+        self.predict = None
+        self.labels = None
         
     
-    def fit(self, X, 
-                plot_density = False, 
+    def fit(self, X,  
+                plot_silhouette = False,
                 plot_cluster = False, 
                 plot_traces = False,
                 plot_traces_average = False, 
-                bw_cst = (-5, -2, 20), 
+                bw_cst = [0.008], 
                 flip = False,
                 filter_input = False,
                 filter_threshold = 0.0005,
-                cluster_xlim = None,
-                traces_xlim = None,
-                skip = 1):
+                traces_xlim = None):
         """
         Use the loaded autoencoder to transform the input data into a 
         low-dimensional representation. The labels are assigned to the samples by
@@ -109,19 +110,20 @@ class autoencoder_kernelDensity():
                 X_low_dim = self.network(X_pytorch, encoding=True)
                 X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
-        kd = kernel_density(X_low_dim, bw_cst, skip, flip)
+        #sgm = silhouette_gaussianMixture(X_low_dim, cluster_interval, flip=flip)
+        sgm = density_gaussianMixture(X_low_dim, bw_cst, flip=flip)
             
-        if plot_density:
-            kd.plot_density()
+        if plot_silhouette:
+            sgm.plot_silhouette()
         if plot_cluster:
-            kd.plot_cluster(cluster_xlim)
+            sgm.plot_cluster() #cluster_xlim
         if plot_traces:
-            kd.plot_traces(X, traces_xlim)
+            sgm.plot_traces(X, traces_xlim)
         if plot_traces_average:
-            kd.plot_traces_average(X, traces_xlim)
+            sgm.plot_traces_average(X, traces_xlim)
 
-        self.fit_ = kd.fit
-        self.mins = kd.mins
+        self.predict = sgm.predict
+        self.labels = sgm.labels
 
 
     def get_clusters(self, X, 
@@ -146,11 +148,11 @@ class autoencoder_kernelDensity():
                 X_low_dim = self.network(X_pytorch, encoding=True)
                 X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
-        labels = self.fit_(X_low_dim)
+        labels = self.predict(X_low_dim)
         clusters_traces = []
         clusters_low_dim = []
 
-        for number in range(len(self.mins)+1):
+        for number in self.labels:
             condition = labels == number
             clusters_traces.append(X[condition])
             clusters_low_dim.append(X_low_dim[condition])
@@ -179,9 +181,7 @@ class autoencoder_kernelDensity():
         self.network.eval()
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
-            #X_low_dim = X_low_dim.detach().numpy().reshape(-1)
-
-        return self.fit_(X_low_dim)
+        return self.predict(X_low_dim).flatten()
 
     
 
@@ -211,6 +211,6 @@ class autoencoder_kernelDensity():
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
-            labels = self.fit_(X_low_dim)
+            labels = self.predict(X_low_dim)
 
         return labels[MSE < threshold]

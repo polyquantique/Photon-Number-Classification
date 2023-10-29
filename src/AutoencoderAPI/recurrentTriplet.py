@@ -13,9 +13,7 @@ from .setup.train.generic import train as train_MSE
 from .setup.train.triplet import train as train_Triplet
 from .setup.validation.tripletValidation import validation
 from .utils.files import save_all
-from .utils.kernelDensity import kernel_density
-
-plt.style.use("seaborn-pastel")
+from .utils.clustering.kernelDensity import kernel_density
 
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)

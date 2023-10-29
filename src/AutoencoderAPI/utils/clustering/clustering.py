@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .metrics import silhouette_kmean
+from .silhouetteKmeans import silhouette_kmean
 
 
 

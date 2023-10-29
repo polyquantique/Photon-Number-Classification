@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.manifold import trustworthiness
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 
-from AutoencoderAPI.utils.kernelDensity import kernel_density
+from AutoencoderAPI.utils.clustering.kernelDensity import kernel_density
 
 class compare():
 

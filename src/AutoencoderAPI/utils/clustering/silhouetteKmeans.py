@@ -25,7 +25,7 @@ class silhouette_kmean():
         km = KMeans(n_clusters=optimal_cluster, random_state=42, algorithm='lloyd', n_init='auto', tol=1e-12, max_iter=600)
         fit = km.fit(feature)
 
-        # Map labels based on their position in feature space
+        # Map labels based on their position in latent space
         cluster_centers = fit.cluster_centers_
         unsorted_labels = fit.labels_
         unique_labels = range(len(cluster_centers))

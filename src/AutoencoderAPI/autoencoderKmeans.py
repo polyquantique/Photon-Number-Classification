@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from .utils.files import open_object
-from .utils.clustering import clustering
+from .utils.clustering.clustering import clustering
 from .setup.networks.autoencoder import build_autoencoder
 
 

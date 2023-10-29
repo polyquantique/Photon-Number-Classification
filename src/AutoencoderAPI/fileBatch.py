@@ -1,10 +1,9 @@
 import numpy as np
 from os import listdir, makedirs
 from datetime import datetime
-from random import choices, choice, sample
 
 import torch
-from sklearn.model_selection import KFold, train_test_split, ParameterGrid
+from sklearn.model_selection import KFold, train_test_split
 
 from tqdm.notebook import tqdm
 import warnings
