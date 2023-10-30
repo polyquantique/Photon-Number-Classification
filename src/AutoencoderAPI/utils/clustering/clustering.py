@@ -9,6 +9,7 @@ class clustering():
 
     def __init__(self, X, min_cluster, max_cluster):
 
+        self.style_name = "seaborn-v0_8"
         self.min_cluster = min_cluster
         self.max_cluster = max_cluster
 
@@ -28,21 +29,25 @@ class clustering():
         print("Number of clusters : ", self.optimal_cluster)
         print("Silhouette score : ", self.optimal_score)
 
-        plt.figure()
-        for index_cluster, cluster in enumerate(self.clusters):
-            plt.hist(cluster.flatten() , self.bins, alpha = 0.5, label=f"{index_cluster}", fill=True, histtype='step')
-        plt.xlabel("feature")
-        plt.ylabel("counts")
-        plt.legend(ncol=3)
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4))
+            for index_cluster, cluster in enumerate(self.clusters):
+                plt.hist(cluster.flatten() , self.bins, alpha = 0.5, label=f"{index_cluster}", fill=True, histtype='step')
+            plt.xlabel("feature")
+            plt.ylabel("counts")
+            plt.legend(ncol=3)
+            plt.show()
 
     def plot_silhouette(self):
 
         print("Number of clusters : ", self.optimal_cluster)
         print("Silhouette score : ", self.optimal_score)
 
-        plt.figure()
-        plt.plot(range(self.min_cluster, self.max_cluster+1), self.scores)
-        plt.xlabel("Number of cluster")
-        plt.ylabel("Silhouette score")
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4))
+            plt.plot(range(self.min_cluster, self.max_cluster+1), self.scores)
+            plt.xlabel("Number of cluster")
+            plt.ylabel("Silhouette score")
+            plt.show()
 
 

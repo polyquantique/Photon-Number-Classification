@@ -15,9 +15,6 @@ from .setup.validation.tripletValidation import validation
 from .setup.validation.autoencoderValidation import validation
 from .utils.files import save_all
 
-
-plt.style.use("seaborn-pastel")
-
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)
 

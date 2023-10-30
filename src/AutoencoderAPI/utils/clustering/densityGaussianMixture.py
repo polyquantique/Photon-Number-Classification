@@ -49,7 +49,7 @@ class density_gaussianMixture():
         centroids, mapping = zip(*sorted(zip(cluster_means, unique_labels)))
         sorted_labels = np.array([mapping[i] for i in labels])
 
-
+        self.style_name = "seaborn-v0_8"
         self.clusters_low = []
         self.condition = []
         for label in mapping:
@@ -102,17 +102,18 @@ class density_gaussianMixture():
         color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n))))
 
         #with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 'ytick.color':'white', 'figure.facecolor':'white'}):
-        plt.figure(figsize=(10,4)) #, dpi=100
-        for index_cluster, cluster in enumerate(self.clusters_low):
-            c = next(color)
-            plt.hist(cluster.flatten() , self.bins, label=f"{index_cluster}", fill=True, histtype='step',color=c)#"#8dd3c7")
-        for index, mean_value in enumerate(self.cluster_means):
-            plt.plot(x, gaussian_function(x, mean_value, self.cluster_covariance[index]), color="k")
-        plt.xlabel("Latent Space")
-        plt.ylabel("Counts")
-   
-        plt.legend(ncol=3)
-        #plt.show()
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4)) #, dpi=100
+            for index_cluster, cluster in enumerate(self.clusters_low):
+                c = next(color)
+                plt.hist(cluster.flatten() , self.bins, label=f"{index_cluster}", fill=True, histtype='step',color=c)#"#8dd3c7")
+            for index, mean_value in enumerate(self.cluster_means):
+                plt.plot(x, gaussian_function(x, mean_value, self.cluster_covariance[index]), color="k")
+            plt.xlabel("Latent Space")
+            plt.ylabel("Counts")
+
+            plt.legend(ncol=3)
+            plt.show()
         #plt.savefig('cluster.svg',format="svg", transparent=True)
 
 
@@ -131,26 +132,27 @@ class density_gaussianMixture():
         None
 
         """
-        plt.figure(figsize=(10,4)) #, dpi=100
-        n =len(self.condition)
-        color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
-        
-        for condition in self.condition:
-            cluster = X[condition]
-            c = next(color)
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4)) #, dpi=100
+            n =len(self.condition)
+            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
+            
+            for condition in self.condition:
+                cluster = X[condition]
+                c = next(color)
 
-            if len(cluster) > 1000:
-                cluster = cluster[:1000]
+                if len(cluster) > 1000:
+                    cluster = cluster[:1000]
 
-            for i, _ in enumerate(cluster):
-                plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
-                
-        if xlim != None:
-            plt.xlim(xlim[0],xlim[1])
+                for i, _ in enumerate(cluster):
+                    plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
+                    
+            if xlim != None:
+                plt.xlim(xlim[0],xlim[1])
 
-        plt.xlabel("Time (a.u.)")
-        plt.ylabel("Voltage (a.u.)")
-        #plt.show()
+            plt.xlabel("Time (a.u.)")
+            plt.ylabel("Voltage (a.u.)")
+            plt.show()
         #plt.savefig('traces.svg',format="svg", transparent=True)
 
 
@@ -169,23 +171,24 @@ class density_gaussianMixture():
         None
 
         """
-        plt.figure(figsize=(10,4)) #, dpi=100
-        n =len(self.condition)
-        color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
-        
-        for condition in self.condition:
-            cluster = X[condition]
-            c = next(color)
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4)) #, dpi=100
+            n =len(self.condition)
+            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
+            
+            for condition in self.condition:
+                cluster = X[condition]
+                c = next(color)
 
-            if len(cluster) > 1000:
-                cluster = cluster[:1000]
+                if len(cluster) > 1000:
+                    cluster = cluster[:1000]
 
-            plt.plot(np.mean(cluster, axis=0), c=c)
-                
-        if xlim != None:
-            plt.xlim(xlim[0],xlim[1])
+                plt.plot(np.mean(cluster, axis=0), c=c)
+                    
+            if xlim != None:
+                plt.xlim(xlim[0],xlim[1])
 
-        plt.xlabel("Time (a.u.)")
-        plt.ylabel("Voltage (a.u.)")
-        #plt.show()
-        #plt.savefig('average_traces.svg',format="svg", transparent=True)
+            plt.xlabel("Time (a.u.)")
+            plt.ylabel("Voltage (a.u.)")
+            plt.show()
+            #plt.savefig('average_traces.svg',format="svg", transparent=True)

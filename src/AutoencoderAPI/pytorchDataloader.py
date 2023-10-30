@@ -1,5 +1,4 @@
 from os import makedirs
-import matplotlib.pyplot as plt
 from datetime import datetime
 from tqdm.notebook import tqdm
 

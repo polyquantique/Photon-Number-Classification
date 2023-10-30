@@ -1,8 +1,7 @@
 import torch
-import numpy as np
 
 from .utils.files import open_object
-from .utils.clustering.silhouetteGaussianMixture import silhouette_gaussianMixture
+#from .utils.clustering.silhouetteGaussianMixture import silhouette_gaussianMixture
 from .utils.clustering.densityGaussianMixture import density_gaussianMixture
 from .setup.networks.autoencoder import build_autoencoder
 
@@ -109,6 +108,10 @@ class autoencoder_gaussianMixture():
             else:
                 X_low_dim = self.network(X_pytorch, encoding=True)
                 X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+    
+        import matplotlib.pyplot as plt
+
+        plt.hist(X_low_dim, bins=5000)
 
         #sgm = silhouette_gaussianMixture(X_low_dim, cluster_interval, flip=flip)
         sgm = density_gaussianMixture(X_low_dim, bw_cst, flip=flip)

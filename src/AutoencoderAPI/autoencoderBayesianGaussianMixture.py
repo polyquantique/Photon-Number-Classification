@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 
 from .utils.files import open_object
 from .utils.clustering.bayesianGaussianMixture import bayesian_gaussianMixture

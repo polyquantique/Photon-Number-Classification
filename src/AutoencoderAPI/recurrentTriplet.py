@@ -1,6 +1,5 @@
 from os import makedirs, listdir
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime
 from tqdm.notebook import tqdm
 
@@ -140,7 +139,7 @@ class recurrentTriplet():
 
             cl = kernel_density(X_low_dim, bw)
 
-            return torch.from_numpy(cl.labels)
+            return cl.labels
 
                 
 

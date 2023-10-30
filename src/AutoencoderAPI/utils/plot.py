@@ -27,36 +27,38 @@ def load_run_results(file_name, bw = (-5, -2, 20)):
     """
     path = f"{file_name}"
     
-    for index_fold, fold in enumerate(listdir(path)):
+    with plt.style.context("seaborn-v0_8"):
+        for index_fold, fold in enumerate(listdir(path)):
 
-        fig, axs = plt.subplots(3,1,figsize=(10,10))
+            fig, axs = plt.subplots(3,1,figsize=(10,10))
 
-        results = open_object(f"{path}/{fold}/results.bin")
+            results = open_object(f"{path}/{fold}/results.bin")
 
-        kd = kernel_density(np.array(results['encode']), bw)
-        clusters = kd.clusters_low
-        bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).flatten()
+            kd = kernel_density(np.array(results['encode']), bw)
+            clusters = kd.clusters_low
+            bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).flatten()
 
-        for index_cluster, cluster in enumerate(clusters):
-            axs[0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
-        axs[0].set_xlabel("feature")
-        axs[0].set_ylabel("counts")
-        axs[0].legend(ncol=3)
-            
-        axs[2].plot(results['input'][1],label=f"Autoencoder input {index_fold}")
-        axs[2].plot(results['decode'][1],label=f"Autoencoder output {index_fold}")
-        axs[2].set_ylabel("Normalized voltage")
-        axs[2].set_xlabel("element")
-        axs[2].legend()
+            for index_cluster, cluster in enumerate(clusters):
+                axs[0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
+            axs[0].set_xlabel("feature")
+            axs[0].set_ylabel("counts")
+            axs[0].legend(ncol=3)
+                
+            axs[2].plot(results['input'][1],label=f"Autoencoder input {index_fold}")
+            axs[2].plot(results['decode'][1],label=f"Autoencoder output {index_fold}")
+            axs[2].set_ylabel("Normalized voltage")
+            axs[2].set_xlabel("element")
+            axs[2].legend()
 
-        loss = open_object(f"{path}/{fold}/loss.bin")
+            loss = open_object(f"{path}/{fold}/loss.bin")
 
-        axs[1].plot(loss['train_loss'],label=f"Train {index_fold}")
-        axs[1].plot(loss['validation_loss'],label=f"Validation {index_fold}")
-        axs[1].hlines(loss['test_loss'], 0, len(loss['validation_loss'])-1, linestyles='dashed',label = f"Test {index_fold}")
-        axs[1].legend()
-        axs[1].set_ylabel("loss")
-        axs[1].set_xlabel("epoch")
+            axs[1].plot(loss['train_loss'],label=f"Train {index_fold}")
+            axs[1].plot(loss['validation_loss'],label=f"Validation {index_fold}")
+            axs[1].hlines(loss['test_loss'], 0, len(loss['validation_loss'])-1, linestyles='dashed',label = f"Test {index_fold}")
+            axs[1].legend()
+            axs[1].set_ylabel("loss")
+            axs[1].set_xlabel("epoch")
+            plt.show()
 
 
 
@@ -85,41 +87,42 @@ def load_sweep_results(file_name, parameters):
     loss_sweep = []
     min_loss = 0#1
     
-    for sweep in sorted(listdir(path)):
-        loss_cum = 0
-        fold_list = sorted(listdir(f"{path}/{sweep}"))
-        fold_len = len(fold_list)
+    with plt.style.context("seaborn-v0_8"):
+        for sweep in sorted(listdir(path)):
+            loss_cum = 0
+            fold_list = sorted(listdir(f"{path}/{sweep}"))
+            fold_len = len(fold_list)
 
-        for index, fold in enumerate(fold_list):
-            loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
-            loss_cum += loss['Silhouette']#['test_loss'][0]
+            for index, fold in enumerate(fold_list):
+                loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
+                loss_cum += loss['Silhouette']#['test_loss'][0]
 
-        config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
+            config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
+            
+            parameter1.append(config_file['train'][parameters[0]])
+            parameter2.append(config_file['train'][parameters[1]])
+            loss_sweep.append(loss_cum / fold_len)
+
+            if loss_sweep[-1] > min_loss:   #< min_loss:
+                min_loss = loss_sweep[-1]
+                min_parameter1 = parameter1[-1]
+                min_parameter2 = parameter2[-1]
+
         
-        parameter1.append(config_file['train'][parameters[0]])
-        parameter2.append(config_file['train'][parameters[1]])
-        loss_sweep.append(loss_cum / fold_len)
+        x=np.unique(parameter1)
+        y=np.unique(parameter2)
+        X,Y = np.meshgrid(x,y)
+        print("min : ", min_loss)
+        print(f"{parameters[0]} : ", min_parameter1)
+        print(f"{parameters[1]} : ", min_parameter2)
 
-        if loss_sweep[-1] > min_loss:   #< min_loss:
-            min_loss = loss_sweep[-1]
-            min_parameter1 = parameter1[-1]
-            min_parameter2 = parameter2[-1]
+        Z= np.array(loss_sweep).reshape(len(y),len(x))#np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
+        plt.xticks(np.arange(len(x)), labels=x)
+        plt.yticks(np.arange(len(y)), labels=y)
 
-    
-    x=np.unique(parameter1)
-    y=np.unique(parameter2)
-    X,Y = np.meshgrid(x,y)
-    print("min : ", min_loss)
-    print(f"{parameters[0]} : ", min_parameter1)
-    print(f"{parameters[1]} : ", min_parameter2)
-
-    Z= np.array(loss_sweep).reshape(len(y),len(x))#np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
-    plt.xticks(np.arange(len(x)), labels=x)
-    plt.yticks(np.arange(len(y)), labels=y)
-
-    #plt.pcolormesh(X,Y,Z)
-    plt.imshow(Z)#, norm=colors.LogNorm(), interpolation="bilinear")
-    plt.xlabel(parameters[0])
-    plt.ylabel(parameters[1])
-    plt.colorbar()
-    plt.show()
+        #plt.pcolormesh(X,Y,Z)
+        plt.imshow(Z)#, norm=colors.LogNorm(), interpolation="bilinear")
+        plt.xlabel(parameters[0])
+        plt.ylabel(parameters[1])
+        plt.colorbar()
+        plt.show()

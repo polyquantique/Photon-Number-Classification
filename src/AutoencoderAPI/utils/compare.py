@@ -8,9 +8,11 @@ from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bo
 
 from AutoencoderAPI.utils.clustering.kernelDensity import kernel_density
 
+
 class compare():
 
     def __init__(self, bw = (-5, -2, 20)):
+        self.style_name = "seaborn-v0_8"
         self.metric_list = [    
                         ('Silhouette'                   , self.silhouette_kernel         , 1), 
                         ('Calinski Harabasz'            , self.calinski_harabasz_kernel  , 1),
@@ -260,18 +262,19 @@ class compare():
     
         norm_scores = (scores - np.nanmin(scores, axis=0)) / (np.nanmax(scores, axis=0) - np.nanmin(scores, axis=0))
 
-        plt.figure(figsize=(10,5))
-        plt.imshow(norm_scores,aspect='auto',cmap="GnBu_r")#, interpolation="bilinear")
-        #plt.xlabel('Metric')
-        #plt.ylabel('Method')
-        plt.xticks(np.arange(len(metric_list)), labels=[i[0] for i in metric_list])
-        plt.yticks(np.arange(len(Title)), labels=Title)
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,5))
+            plt.imshow(norm_scores,aspect='auto',cmap="GnBu_r")#, interpolation="bilinear")
+            #plt.xlabel('Metric')
+            #plt.ylabel('Method')
+            plt.xticks(np.arange(len(metric_list)), labels=[i[0] for i in metric_list])
+            plt.yticks(np.arange(len(Title)), labels=Title)
 
-        for (j,i),label in np.ndenumerate(scores):
-            plt.text(i,j,'{:.2e}'.format(label),ha='center',va='center')
-            plt.text(i,j,'{:.2e}'.format(label),ha='center',va='center')
+            for (j,i),label in np.ndenumerate(scores):
+                plt.text(i,j,'{:.2e}'.format(label),ha='center',va='center')
+                plt.text(i,j,'{:.2e}'.format(label),ha='center',va='center')
 
-        plt.show()
+            plt.show()
 
 
     
@@ -312,14 +315,15 @@ class compare():
                     #    else:
                     #        scores[index_metric][index_samples][label] = metric(X_init_temp, X_reconst_temp)
     
-        for index_metric, metric_score in enumerate(scores):
+        with plt.style.context(self.style_name):
+            for index_metric, metric_score in enumerate(scores):
 
-            plt.figure(figsize=(10,5))
-            plt.title(f"{self.metric_list[index_metric][0]}")
+                plt.figure(figsize=(10,5))
+                plt.title(f"{self.metric_list[index_metric][0]}")
 
-            for index_method, method in enumerate(X_init):
-                sc = scores[index_metric][index_method]
-                plt.plot(sc[sc != 0], label=f"{Title[index_method]}")
+                for index_method, method in enumerate(X_init):
+                    sc = scores[index_metric][index_method]
+                    plt.plot(sc[sc != 0], label=f"{Title[index_method]}")
 
-            plt.legend()
-            plt.show()
+                plt.legend()
+                plt.show()
