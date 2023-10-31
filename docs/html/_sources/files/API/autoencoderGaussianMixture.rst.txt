@@ -1,0 +1,5 @@
+autoencoderGaussianMixture
+--------------------------
+
+.. autoclass:: AutoencoderAPI.autoencoderGaussianMixture.autoencoder_gaussianMixture
+   :members:

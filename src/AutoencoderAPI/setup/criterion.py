@@ -47,9 +47,9 @@ class build_criterion:
             "KLDivLoss"          : (nn.KLDivLoss() , generic),
             "TripletMarginLoss"  : (nn.TripletMarginLoss() , triplet),
             "TripletMSE"         : (triplet_MSE() , custom_without_sample),
-            "pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),
+            #"pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),
             "sklearn_kernelDensity_loss"      : (sklearn_kernelDensity_loss() , custom_with_sample),
-            "sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),
+            #"sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),
             "trustworthinessLoss" : (trustworthinessLoss(), custom_with_sample)
         }
 

@@ -1,7 +1,5 @@
 from os import makedirs
-import matplotlib.pyplot as plt
 from datetime import datetime
-import random
 from tqdm.notebook import tqdm
 
 from sklearn.model_selection import KFold
@@ -17,8 +15,6 @@ from .setup.validation.autoencoderValidation import validation
 from .setup.optimizer import build_optimizer
 from .setup.criterion import build_criterion
 from .utils.files import save_all
-
-plt.style.use("seaborn-pastel")
 
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)

@@ -1,0 +1,12 @@
+clustering
+==========
+
+.. toctree::
+   :maxdepth: 2
+   :caption: clustering:
+
+   clustering/kernelDensity
+   clustering/bayesianGaussianMixture
+   clustering/densityGaussianMixture
+   clustering/silhouetteGaussianMixture
+   clustering/silhouetteKmeans

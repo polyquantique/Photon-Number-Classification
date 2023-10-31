@@ -1,6 +1,5 @@
 from os import makedirs, listdir
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime
 from tqdm.notebook import tqdm
 
@@ -13,9 +12,7 @@ from .setup.train.generic import train as train_MSE
 from .setup.train.triplet import train as train_Triplet
 from .setup.validation.tripletValidation import validation
 from .utils.files import save_all
-from .utils.kernelDensity import kernel_density
-
-plt.style.use("seaborn-pastel")
+from .utils.clustering.kernelDensity import kernel_density
 
 torch.use_deterministic_algorithms(True)
 torch.manual_seed(42)
@@ -52,7 +49,7 @@ class recurrentTriplet():
 
         log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
 
-        # Define device and runs on Cuda if is available
+        # Define device and run on Cuda if is available
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Define dataset
@@ -78,7 +75,7 @@ class recurrentTriplet():
     def split_dataset(self, data):
         """
         Split the dataset into a training, validation and testing set.
-        The index of the sets are given as an output.
+        The index of the sets is given as an output.
 
         Separation of the original dataset:
 
@@ -142,7 +139,7 @@ class recurrentTriplet():
 
             cl = kernel_density(X_low_dim, bw)
 
-            return torch.from_numpy(cl.labels)
+            return cl.labels
 
                 
 
@@ -196,13 +193,14 @@ class recurrentTriplet():
 
         n_cluster = range(17,25)
         train_dataset = data[train_index]
+        validation_dataset = data[validation_index]
         for epoch in tqdm(range(config['train']['epochs']) , desc="Epoch Triplet"):
             #, train_dataset
             train_labels = self.update_cluster(network, train_dataset, bw_cst)
             train_loss = train_Triplet(config, network, train_dataset, optimizer, criterion, train_labels)
 
-            validation_labels = self.update_cluster(network, data[validation_index], bw_cst)
-            validation_loss = validation(config['train']['alpha'], network, data[validation_index], criterion, validation_labels)
+            validation_labels = self.update_cluster(network, validation_dataset, bw_cst)
+            validation_loss = validation(config['train']['alpha'], network, validation_dataset, criterion, validation_labels)
 
             loss['train_loss'].append(train_loss) # Triplet
             loss['validation_loss'].append(validation_loss) # Triplet

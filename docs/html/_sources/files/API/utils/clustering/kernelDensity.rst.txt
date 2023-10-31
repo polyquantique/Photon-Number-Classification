@@ -1,0 +1,6 @@
+kernelDensity
+-------------
+
+.. autoclass:: AutoencoderAPI.utils.clustering.kernelDensity.kernel_density
+   :members:
+

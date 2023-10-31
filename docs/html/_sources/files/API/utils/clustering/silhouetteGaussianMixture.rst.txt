@@ -1,0 +1,5 @@
+silhouetteGaussianMixture
+-------------------------
+
+.. autoclass:: AutoencoderAPI.utils.clustering.silhouetteGaussianMixture.silhouette_gaussianMixture
+   :members:

@@ -1,0 +1,31 @@
+sweep Dictionaries
+--------------------------
+
+
+
+.. code-block:: python
+
+    run_config = {
+    'files' : {
+            'dataset'                  : "Datasets/NIST (250) train",
+            'path_save'                : 'AutoencoderLog/',
+            'input_dimension'          : 250
+            },
+    'network' : {
+            'network_type'             : 'generic',
+            'activation_list'          : ['Mish', 'CELU', 'Tanh', 'CELU', 'Mish'],
+            'layer_list'               : [200, 50, 50, 1, 50, 50, 200],
+            'layer_type'               : 'Linear'
+            },
+    'train' : {
+            'optimizer'                : 'Adam',
+            'criterion'                : 'trustworthinessLoss', 
+            'k-fold'                   : 2,
+            'batch_number'             : 1,
+            'epochs'                   : 10,
+            'skip_elements'            : 1,
+            'learning_rate'            : 1e-6
+            }
+    }
+
+

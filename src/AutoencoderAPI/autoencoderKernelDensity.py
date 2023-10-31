@@ -1,7 +1,7 @@
 import torch
 
 from .utils.files import open_object
-from .utils.kernelDensity import kernel_density
+from .utils.clustering.kernelDensity import kernel_density
 from .setup.networks.autoencoder import build_autoencoder
 
 
@@ -25,7 +25,7 @@ class autoencoder_kernelDensity():
         config_load = open_object(f"{model_path}/log.bin")
         network = build_autoencoder(config_load)
         network.load_state_dict(torch.load(f"{model_path}/model.pt"))
-        print(config_load)
+        
         if config_load['train']['skip_elements'] <= 1:
             self.size = config_load['files']['input_dimension']
         else:
@@ -45,8 +45,6 @@ class autoencoder_kernelDensity():
                 flip = False,
                 filter_input = False,
                 filter_threshold = 0.0005,
-                cluster_xlim = None,
-                traces_xlim = None,
                 skip = 1):
         """
         Use the loaded autoencoder to transform the input data into a 
@@ -72,16 +70,16 @@ class autoencoder_kernelDensity():
             If `True` plot the histogram of these samples in the feature space with their labels.
         plot_traces : bool
             If `True` plot the labelled input traces.
-        bw : tuple or numpy.array
+        bw_cst : tuple or numpy.array
             If bw is a tuple, it represents the parameters inside np.logspace(*bw).
             Otherwise, an array can be used, this represents an array containing all 
             the possible bandwidth used in the kernel density estimation.
         flip : bool
             flips the feature space to inverse le labels ordering.
-        cluster_xlim : tuple
-            The limits of the horizontal axis when plotting the clusters. Follows the structure (min,max).
-        traces_xlim : tuple
-            The limits of the horizontal axis when plotting the traces. Follows the structure (min,max).
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
         skip : int
             Skip a number of elements to define the feature space separation following the [::skip] structure.
 
@@ -114,14 +112,48 @@ class autoencoder_kernelDensity():
         if plot_density:
             kd.plot_density()
         if plot_cluster:
-            kd.plot_cluster(cluster_xlim)
+            kd.plot_cluster()
         if plot_traces:
-            kd.plot_traces(X, traces_xlim)
+            kd.plot_traces(X)
         if plot_traces_average:
-            kd.plot_traces_average(X, traces_xlim)
+            kd.plot_traces_average(X)
 
         self.fit_ = kd.fit
+        self.mins = kd.mins
 
+
+    def get_clusters(self, X, 
+                     filter_input = False, 
+                     filter_threshold = 0.0005):
+
+        with torch.no_grad():
+            X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
+            
+            if filter_input:
+                X_low_dim, X_reconst = self.network(X_pytorch, both=True)
+            
+                X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
+                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+
+                MSE = ((X - X_reconst)**2).mean(axis=1)
+                condition = MSE < filter_threshold
+
+                X_low_dim = X_low_dim[condition]
+                X = X[condition]
+            else:
+                X_low_dim = self.network(X_pytorch, encoding=True)
+                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+
+        labels = self.fit_(X_low_dim)
+        clusters_traces = []
+        clusters_low_dim = []
+
+        for number in range(len(self.mins)+1):
+            condition = labels == number
+            clusters_traces.append(X[condition])
+            clusters_low_dim.append(X_low_dim[condition])
+
+        return clusters_traces, clusters_low_dim
         
 
     def get_label(self, X):
@@ -145,7 +177,7 @@ class autoencoder_kernelDensity():
         self.network.eval()
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1)
+            #X_low_dim = X_low_dim.detach().numpy().reshape(-1)
 
         return self.fit_(X_low_dim)
 

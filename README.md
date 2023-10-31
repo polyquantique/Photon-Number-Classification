@@ -41,6 +41,8 @@ Neural networks allow for a wide variety of architectures and therefore their ev
 ## TODO
 
 - Pytorch dataset classs structure for batching and true random.
+- Test GPU functionalities of pytorch
+- Modify Log structure to reduce the storing and change it to computing when loading results.
 
 ## ACKNOWLEDGMENTS
 
