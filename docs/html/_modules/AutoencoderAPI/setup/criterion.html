@@ -1,0 +1,384 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" />
+
+    <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
+        <title>AutoencoderAPI.setup.criterion - Photon-Number-Classification documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b849a4e9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=135e06be" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=36a5483c" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f0f0f0;
+  --color-code-foreground: black;
+  --color-brand-primary: #7C4DFF;
+  --color-brand-content: #7C4DFF;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #272822;
+  --color-code-foreground: #f8f8f2;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #272822;
+  --color-code-foreground: #f8f8f2;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-half" viewBox="0 0 24 24">
+    <title>Auto light/dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-shadow">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M13 12h5" />
+      <path d="M13 15h4" />
+      <path d="M13 18h1" />
+      <path d="M13 9h4" />
+      <path d="M13 6h1" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">Photon-Number-Classification  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  
+  
+  <span class="sidebar-brand-text">Photon-Number-Classification  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../files/Introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../files/Requirements.html">Requirements</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../files/AutoencoderAPI.html">AutoencoderAPI</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of AutoencoderAPI</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/API/recurrentTriplet.html">recurrentTripletKernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/API/autoencoderKernelDensity.html">autoencoderKernelDensity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/API/fileBatch.html">fileBatch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/API/sweep.html">sweep</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../files/API/setup.html">setup</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of setup</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/setup/criterion.html">criterion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/setup/optimizer.html">optimizer</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../files/API/setup/networks.html">networks</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of networks</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/networks/autoencoder.html">autoencoder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/networks/transformerAutoencoder.html">transformerAutoencoder</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../files/API/setup/train.html">train</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of train</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/train/generic.html">generic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/train/triplet.html">triplet</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../files/API/setup/validation.html">validation</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of validation</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/validation/autoencoderValidation.html">autoencoderValidation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/setup/validation/tripletValidation.html">tripletValidation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../files/API/utils.html">utils</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><div class="visually-hidden">Toggle navigation of utils</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/utils/files.html">files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/utils/plot.html">plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/utils/correlation.html">correlation</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../files/API/utils/clustering.html">clustering</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of clustering</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/utils/clustering/kernelDensity.html">kernelDensity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/utils/clustering/bayesianGaussianMixture.html">bayesianGaussianMixture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/utils/clustering/densityGaussianMixture.html">densityGaussianMixture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/utils/clustering/silhouetteGaussianMixture.html">silhouetteGaussianMixture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../files/API/utils/clustering/silhouetteKmeans.html">silhouetteKmeans</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../files/API/utils/compare.html">compare</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../files/Tutorial.html">Tutorial</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><div class="visually-hidden">Toggle navigation of Tutorial</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/Tutorials/trainingAutoencoder.html">Training the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/Tutorials/useAutoencoder.html">Use the autoencoder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/Tutorials/fileBatchDict.html">fileBatch Dictionaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/Tutorials/recurrentTripletDict.html">recurrentTriplet Dictionaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../files/Tutorials/sweepDict.html">sweep Dictionaries</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../files/dev/Github.html">Github</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../files/dev/ChangeLog.html">Change Log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../files/dev/Licence.html">Licence</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main">
+          <h1>Source code for AutoencoderAPI.setup.criterion</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">sample</span>
+
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">.custom_loss</span> <span class="kn">import</span> <span class="o">*</span>
+
+<div class="viewcode-block" id="build_criterion">
+<a class="viewcode-back" href="../../../files/API/setup/criterion.html#AutoencoderAPI.setup.criterion.build_criterion">[docs]</a>
+<span class="k">class</span> <span class="nc">build_criterion</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Definition of the criterion used in the training process.</span>
+<span class="sd">    Multiple loss function are evaluated and each require specific inputs.</span>
+<span class="sd">    The initialization takes care of the different cases to remove the selection </span>
+<span class="sd">    process of the training loops.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : dict</span>
+<span class="sd">        Dictionary containing the experiment parameters. </span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        
+        <span class="k">def</span> <span class="nf">generic</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="n">list_</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">triplet</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">negative</span><span class="p">,</span> <span class="n">param2</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span><span class="p">(</span><span class="n">input_</span><span class="p">,</span> <span class="n">output_</span><span class="p">,</span> <span class="n">negative</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">custom_with_sample</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="n">list_</span><span class="p">):</span>
+            <span class="n">X_sub</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">sample</span><span class="p">(</span><span class="n">list_</span><span class="p">,</span> <span class="mi">1_000</span><span class="p">)]</span>
+            <span class="n">crit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span>
+            <span class="k">return</span> <span class="n">crit</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="n">X_sub</span><span class="p">)</span>
+        
+        <span class="k">def</span> <span class="nf">custom_without_sample</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">negative</span><span class="p">,</span> <span class="n">param2</span><span class="p">):</span>
+            <span class="n">crit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span>
+            <span class="k">return</span> <span class="n">crit</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">input_</span><span class="p">,</span> <span class="n">output_</span><span class="p">,</span> <span class="n">negative</span><span class="p">,</span> <span class="n">param2</span><span class="p">)</span>
+
+        <span class="n">criterion_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;CrossEntropy&quot;</span>       <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span> <span class="p">,</span> <span class="n">generic</span><span class="p">),</span>
+            <span class="s2">&quot;L1Loss&quot;</span>             <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">L1Loss</span><span class="p">()</span> <span class="p">,</span> <span class="n">generic</span><span class="p">),</span>
+            <span class="s2">&quot;MSELoss&quot;</span>            <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">MSELoss</span><span class="p">()</span> <span class="p">,</span> <span class="n">generic</span><span class="p">),</span>
+            <span class="c1">#&quot;NLLLoss&quot;            : (nn.NLLLoss() , generic),</span>
+            <span class="s2">&quot;HingeEmbeddingLoss&quot;</span> <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">HingeEmbeddingLoss</span><span class="p">()</span> <span class="p">,</span> <span class="n">generic</span><span class="p">),</span>
+            <span class="c1">#&quot;MarginRankingLoss&quot;  : (nn.MarginRankingLoss() , generic),</span>
+            <span class="s2">&quot;KLDivLoss&quot;</span>          <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">KLDivLoss</span><span class="p">()</span> <span class="p">,</span> <span class="n">generic</span><span class="p">),</span>
+            <span class="s2">&quot;TripletMarginLoss&quot;</span>  <span class="p">:</span> <span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">TripletMarginLoss</span><span class="p">()</span> <span class="p">,</span> <span class="n">triplet</span><span class="p">),</span>
+            <span class="s2">&quot;TripletMSE&quot;</span>         <span class="p">:</span> <span class="p">(</span><span class="n">triplet_MSE</span><span class="p">()</span> <span class="p">,</span> <span class="n">custom_without_sample</span><span class="p">),</span>
+            <span class="c1">#&quot;pytorch_kmeans_silhouette_loss&quot;  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),</span>
+            <span class="s2">&quot;sklearn_kernelDensity_loss&quot;</span>      <span class="p">:</span> <span class="p">(</span><span class="n">sklearn_kernelDensity_loss</span><span class="p">()</span> <span class="p">,</span> <span class="n">custom_with_sample</span><span class="p">),</span>
+            <span class="c1">#&quot;sklearn_kmeans_silhouette_loss&quot;  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),</span>
+            <span class="s2">&quot;trustworthinessLoss&quot;</span> <span class="p">:</span> <span class="p">(</span><span class="n">trustworthinessLoss</span><span class="p">(),</span> <span class="n">custom_with_sample</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span><span class="p">,</span> <span class="n">crit_type</span> <span class="o">=</span> <span class="n">criterion_dict</span><span class="p">[</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;train&#39;</span><span class="p">][</span><span class="s1">&#39;criterion&#39;</span><span class="p">]]</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span> <span class="o">=</span> <span class="n">criterion_dict</span><span class="p">[</span><span class="s2">&quot;MSELoss&quot;</span><span class="p">]</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;No criterion was defined int the configuration dict (was set MSELoss)&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">lossFunction</span> <span class="o">=</span> <span class="n">crit_type</span>
+        
+
+<div class="viewcode-block" id="build_criterion.forward">
+<a class="viewcode-back" href="../../../files/API/setup/criterion.html#AutoencoderAPI.setup.criterion.build_criterion.forward">[docs]</a>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">param1</span><span class="p">,</span> <span class="n">param2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Use the initialized criterion to output the loss of a specific experiment.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        output_ : torch.tensor</span>
+<span class="sd">            Neural network output (reconstruction for autoencoder).</span>
+<span class="sd">        input_ : torch.tensor</span>
+<span class="sd">            Neural network input.</span>
+<span class="sd">        X : torch.tensor</span>
+<span class="sd">            Dataset </span>
+<span class="sd">        param1 : Any</span>
+<span class="sd">            Depend on criterion type</span>
+<span class="sd">        param2 : Any</span>
+<span class="sd">            Depend on criterion type</span>
+<span class="sd">        </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        loss : torch.tensor</span>
+<span class="sd">            Loss score </span>
+<span class="sd">        &quot;&quot;&quot;</span>   
+        <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lossFunction</span><span class="p">(</span><span class="n">output_</span><span class="p">,</span> <span class="n">input_</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">param1</span><span class="p">,</span> <span class="n">param2</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">loss</span></div>
+</div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023, Nicolas Dalbec-Constant
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/scripts/furo.js?v=32e29ea5"></script>
+    </body>
+</html>

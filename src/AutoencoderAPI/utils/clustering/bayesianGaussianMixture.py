@@ -6,7 +6,24 @@ from matplotlib.pyplot import cm
 
 
 class bayesian_gaussianMixture():
+    """
+    Use Bayesian Gaussian mixture to separate the latent space into regions
+    of high density associated with photon events.
 
+    Parameters
+    ----------
+    X_low : numpy.array
+        Array containing all the samples in their low-dimensional representation.
+    cluster_max : float
+        Maximum number of clusters to consider in the Bayesian Gaussian Mixture.
+    flip : bool
+        If `True` flips the latent space. This can be used to re-order the labels (right to left). 
+
+    Returns
+    -------
+    None
+
+    """
     def __init__(self, X_low, cluster_max, flip=False):
 
         if flip:
@@ -46,6 +63,19 @@ class bayesian_gaussianMixture():
 
 
     def predict(self, X_low):
+        """
+        Predict the label of samples in `X_low` based on initial latent space separation.
+
+        Parameters
+        ----------
+        X_low : numpy.array
+            Array containing all the samples in their low-dimensional representation.
+
+        Returns
+        -------
+        None
+
+        """
         if self.flip:
             X_low = -1*X_low
         labels = self.predict_(X_low)
@@ -54,10 +84,10 @@ class bayesian_gaussianMixture():
     
     
 
-    def plot_cluster(self, xlim=None):
+    def plot_cluster(self):
         """
         Plot a histogram of the samples in the latent space.
-        Each sample is also labels using the kernel density estimation.
+        Each sample is also labeled using the Bayesian Gaussian Mixture.
 
         Parameters
         ----------
@@ -73,21 +103,21 @@ class bayesian_gaussianMixture():
             plt.figure(figsize=(10,4), dpi=100)
             n =len(self.clusters_low)
             color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n))))
+
             for index_cluster, cluster in enumerate(self.clusters_low):
                 c = next(color)
                 plt.hist(cluster.flatten() , self.bins, label=f"{index_cluster}", fill=True, histtype='step',color=c)#"#8dd3c7")
+            
             plt.xlabel("Latent Space")
             plt.ylabel("Counts")
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
             plt.legend(ncol=3)
             plt.show()
             #plt.savefig('cluster.svg',format="svg", transparent=True)
 
 
-    def plot_traces(self, X, xlim=None):
+    def plot_traces(self, X):
         """
-        Plot the traces `X` and labels them by following the order of the low-dimensional representation
+        Plot the traces `X` and label them by following the order of the low-dimensional representation
         given in the initialization process.  
 
         Parameters
@@ -114,9 +144,6 @@ class bayesian_gaussianMixture():
 
                 for i, _ in enumerate(cluster):
                     plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -124,7 +151,7 @@ class bayesian_gaussianMixture():
             #plt.savefig('traces.svg',format="svg", transparent=True)
 
 
-    def plot_traces_average(self, X, xlim=None):
+    def plot_traces_average(self, X):
         """
         Plot the traces average and labels them by following the order of the low-dimensional representation
         given in the initialization process.  
@@ -152,9 +179,6 @@ class bayesian_gaussianMixture():
                     cluster = cluster[:1000]
 
                 plt.plot(np.mean(cluster, axis=0), c=c)
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")

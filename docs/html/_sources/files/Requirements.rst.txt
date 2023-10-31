@@ -1,0 +1,16 @@
+Requirements
+============
+
+The API is designed to use a minimal number of packages.
+Additionnaly the selected libraries are selected to be reliable and open-source.
+
+In :ref:`AutoencoderAPI` a **requirements.txt** file is available containing the following packages : 
+
+.. code-block:: none
+    
+    matplotlib==3.8.0
+    numpy==1.26.1
+    scikit_learn==1.3.2
+    scipy==1.11.3
+    torch==2.1.0
+    tqdm==4.66.1

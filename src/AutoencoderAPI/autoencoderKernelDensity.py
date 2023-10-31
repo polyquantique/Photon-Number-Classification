@@ -45,8 +45,6 @@ class autoencoder_kernelDensity():
                 flip = False,
                 filter_input = False,
                 filter_threshold = 0.0005,
-                cluster_xlim = None,
-                traces_xlim = None,
                 skip = 1):
         """
         Use the loaded autoencoder to transform the input data into a 
@@ -72,16 +70,16 @@ class autoencoder_kernelDensity():
             If `True` plot the histogram of these samples in the feature space with their labels.
         plot_traces : bool
             If `True` plot the labelled input traces.
-        bw : tuple or numpy.array
+        bw_cst : tuple or numpy.array
             If bw is a tuple, it represents the parameters inside np.logspace(*bw).
             Otherwise, an array can be used, this represents an array containing all 
             the possible bandwidth used in the kernel density estimation.
         flip : bool
             flips the feature space to inverse le labels ordering.
-        cluster_xlim : tuple
-            The limits of the horizontal axis when plotting the clusters. Follows the structure (min,max).
-        traces_xlim : tuple
-            The limits of the horizontal axis when plotting the traces. Follows the structure (min,max).
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
         skip : int
             Skip a number of elements to define the feature space separation following the [::skip] structure.
 
@@ -114,11 +112,11 @@ class autoencoder_kernelDensity():
         if plot_density:
             kd.plot_density()
         if plot_cluster:
-            kd.plot_cluster(cluster_xlim)
+            kd.plot_cluster()
         if plot_traces:
-            kd.plot_traces(X, traces_xlim)
+            kd.plot_traces(X)
         if plot_traces_average:
-            kd.plot_traces_average(X, traces_xlim)
+            kd.plot_traces_average(X)
 
         self.fit_ = kd.fit
         self.mins = kd.mins

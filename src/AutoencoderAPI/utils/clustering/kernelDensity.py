@@ -107,7 +107,7 @@ class kernel_density():
             #plt.savefig('density.svg',format="svg", transparent=True)
 
 
-    def plot_cluster(self, xlim=None):
+    def plot_cluster(self):
         """
         Plot a histogram of the samples in the latent space.
         Each sample is also labels using the kernel density estimation.
@@ -129,16 +129,15 @@ class kernel_density():
             for index_cluster, cluster in enumerate(self.clusters_low):
                 c = next(color)
                 plt.hist(cluster.flatten() , self.bins, label=f"{index_cluster}", fill=True, histtype='step',color=c)#"#8dd3c7")
+            
             plt.xlabel("Latent Space")
             plt.ylabel("Counts")
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
             plt.legend(ncol=3)
             plt.show()
             #plt.savefig('cluster.svg',format="svg", transparent=True)
 
 
-    def plot_traces(self, X, xlim=None):
+    def plot_traces(self, X):
         """
         Plot the traces `X` and labels them by following the order of the low-dimensional representation
         given in the initialization process.  
@@ -167,9 +166,6 @@ class kernel_density():
 
                 for i, _ in enumerate(cluster):
                     plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -177,9 +173,9 @@ class kernel_density():
             #plt.savefig('traces.svg',format="svg", transparent=True)
 
 
-    def plot_traces_average(self, X, xlim=None):
+    def plot_traces_average(self, X):
         """
-        Plot the traces average and labels them by following the order of the low-dimensional representation
+        Plot the traces average and label them by following the order of the low-dimensional representation
         given in the initialization process.  
 
         Parameters
@@ -205,9 +201,6 @@ class kernel_density():
                     cluster = cluster[:1000]
 
                 plt.plot(np.mean(cluster, axis=0), c=c)
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")

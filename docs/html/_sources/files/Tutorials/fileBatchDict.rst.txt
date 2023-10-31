@@ -1,0 +1,50 @@
+fileBatch Dictionaries
+----------------------
+
+The :ref:`fileBatch` function can be used to design and train autoencoders from configuration dictionaries.
+
+.. warning::
+        By increasing `batch_number`, fewer files are opened at one time, this can be useful 
+        to reduce the memory usage for large datasets. However, a value different than 1 is not 
+        recommended since it removes the true randomness of the training process 
+        (true random batching is still a feature to develop).
+
+.. warning::
+        The function assumes that the files contain a pre-normalized dataset.
+
+files
+^^^^^
+
+- **dataset** : Path to dataset files. The import is based on `np.fromfile` and was tested using `.bin` files. 
+- **path_save**  : Path where the results are stored. All the output files are given inside a folder named following the structure `run-YYYY-MM-DD-HH-MM`
+- **input_dimension** : Dimension of the 
+
+
+
+.. code-block:: python
+
+    run_config = {
+    'files' : {
+            'dataset'                  : "Datasets/<NameOfDatasetFolder>",
+            'path_save'                : 'AutoencoderLog/',
+            'input_dimension'          : 250
+            },
+    'network' : {
+            'network_type'             : 'generic',
+            'activation_list'          : ['Mish', 'CELU', 'Tanh', 'CELU', 'Mish'],
+            'layer_list'               : [200, 50, 50, 1, 50, 50, 200],
+            'layer_type'               : 'Linear'
+            },
+    'train' : {
+            'optimizer'                : 'Adam',
+            'criterion'                : 'trustworthinessLoss', 
+            'k-fold'                   : 2,
+            'batch_number'             : 1,
+            'epochs'                   : 10,
+            'skip_elements'            : 1,
+            'learning_rate'            : 1e-6
+            }
+    }
+
+
+

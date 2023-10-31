@@ -1,0 +1,14 @@
+Tutorial
+========   
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials:
+
+   Tutorials/trainingAutoencoder
+   Tutorials/useAutoencoder
+   Tutorials/fileBatchDict
+   Tutorials/recurrentTripletDict
+   Tutorials/sweepDict
+
+   

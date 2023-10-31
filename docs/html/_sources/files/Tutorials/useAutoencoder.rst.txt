@@ -1,0 +1,113 @@
+Use the autoencoder
+-------------------
+
+In this example, a trained autoencoder is used to transform new samples into their 
+low-dimensional representation. Additionally, the autoencoder transformation is combined with 
+kernel density estimation to assign a label to each sample.
+
+
+Import autoencoder_kernelDensity
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Only one object is needed to load the autoencoder and use kernel density estimation.
+
+.. code-block:: python
+
+        from AutoencoderAPI.autoencoderKernelDensity import autoencoder_kernelDensity
+
+
+Load dataset
+^^^^^^^^^^^^
+
+A dataset stored locally is used and can be loaded using the following code.
+Two datasets (train and test) are loaded to demonstrate the prediction capabilities of the method.
+
+.. code-block:: python
+
+        signal_size = 250
+        path_train = 'Datasets/train (250)/'
+
+        X_train = np.concatenate([np.fromfile(f"{path_train}{fileName}",dtype=np.float16).reshape(-1,signal_size) for fileName in listdir(path_train)])
+        X_train = X_test.astype("double")
+
+Load model
+^^^^^^^^^^
+
+To fit and predict signals using a trained autoencoder, the :ref:`autoencoderKernelDensity` class is
+used.
+
+.. code-block:: python
+
+        ak = autoencoder_kerneDensity("Autoencoder Log/run-2023-09-21-17-21/fold 0")
+
+
+Separate feature space
+^^^^^^^^^^^^^^^^^^^^^^
+
+The *fit* method is called to separate the feature
+space into zones associated to distinct photon events. These regions are defined 
+using kernel density estimation (:ref:`kernelDensity`). 
+
+The *fit* function can plot a variety of parameters to garantee the different 
+algorithms are working properly.
+
+- plot_density : Kernel density estimation over the feature space.
+- plot_cluster : Histogram of these samples in the feature space with their labels.
+- plot_traces : Labelled input traces. 
+
+To demonstrate the functionalities all plots are generated in this example.
+
+.. code-block:: python
+
+        ak.fit(X_train, plot_density=True, plot_cluster=True, plot_traces=True, bw_cst=[0.01])
+
+
+.. image:: Images/density.png
+        :width: 600
+
+.. image:: Images/feature.png
+        :width: 600
+
+.. image:: Images/traces.png
+        :width: 600
+
+
+Predict new samples
+^^^^^^^^^^^^^^^^^^^
+
+Once the autoencoder is initialized and the feature space is separated the 
+*get_label* function can be used to predict new samples. The following example
+demonstrates the use of the *get_label* function and the time required to process
+
+
+.. code-block:: python
+
+        from timeit import default_timer as timer
+        import matplotlib.pyplot as plt
+
+        start = timer()
+        labels = ak.get_label(X_test)
+        end = timer()
+
+        print("Number of traces : ", len(X))
+        print("Number of traces per second : ", int(len(X) / (end - start)))
+
+        plt.figure(figsize=(10,4), dpi=100)
+        plt.hist(labels)
+        plt.show()
+
+
+Expected output :
+
+.. code-block:: python
+
+        Number of traces :  143360
+        Number of traces per second :  2386326
+
+
+.. image:: Images/distribution.png
+        :width: 600
+
+
+
+

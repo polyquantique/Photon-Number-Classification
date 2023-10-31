@@ -39,15 +39,13 @@ class autoencoder_gaussianMixture():
         
     
     def fit(self, X,  
-                plot_silhouette = False,
                 plot_cluster = False, 
                 plot_traces = False,
                 plot_traces_average = False, 
                 bw_cst = [0.008], 
                 flip = False,
                 filter_input = False,
-                filter_threshold = 0.0005,
-                traces_xlim = None):
+                filter_threshold = 0.0005):
         """
         Use the loaded autoencoder to transform the input data into a 
         low-dimensional representation. The labels are assigned to the samples by
@@ -72,18 +70,16 @@ class autoencoder_gaussianMixture():
             If `True` plot the histogram of these samples in the feature space with their labels.
         plot_traces : bool
             If `True` plot the labelled input traces.
-        bw : tuple or numpy.array
+        bw_cst : tuple or numpy.array
             If bw is a tuple, it represents the parameters inside np.logspace(*bw).
             Otherwise, an array can be used, this represents an array containing all 
             the possible bandwidth used in the kernel density estimation.
         flip : bool
             flips the feature space to inverse le labels ordering.
-        cluster_xlim : tuple
-            The limits of the horizontal axis when plotting the clusters. Follows the structure (min,max).
-        traces_xlim : tuple
-            The limits of the horizontal axis when plotting the traces. Follows the structure (min,max).
-        skip : int
-            Skip a number of elements to define the feature space separation following the [::skip] structure.
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
 
         Returns
         -------
@@ -108,22 +104,16 @@ class autoencoder_gaussianMixture():
             else:
                 X_low_dim = self.network(X_pytorch, encoding=True)
                 X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
-    
-        import matplotlib.pyplot as plt
-
-        plt.hist(X_low_dim, bins=5000)
 
         #sgm = silhouette_gaussianMixture(X_low_dim, cluster_interval, flip=flip)
         sgm = density_gaussianMixture(X_low_dim, bw_cst, flip=flip)
             
-        if plot_silhouette:
-            sgm.plot_silhouette()
         if plot_cluster:
             sgm.plot_cluster() #cluster_xlim
         if plot_traces:
-            sgm.plot_traces(X, traces_xlim)
+            sgm.plot_traces(X)
         if plot_traces_average:
-            sgm.plot_traces_average(X, traces_xlim)
+            sgm.plot_traces_average(X)
 
         self.predict = sgm.predict
         self.labels = sgm.labels
@@ -132,7 +122,29 @@ class autoencoder_gaussianMixture():
     def get_clusters(self, X, 
                      filter_input = False, 
                      filter_threshold = 0.0005):
+        """
+        Sort the traces and their low dimensional representation based on initial fit.
 
+        .. warning::
+            The function requires initial `fit` to work.
+        
+        Parameters
+        ----------
+        X : numpy.array
+            Array containing all the samples.
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
+  
+
+        Returns
+        -------
+        clusters_traces : list
+            List of numpy arrays containing the traces for every cluster.
+        clusters_low_dim : list
+            List of numpy arrays containg the low dimensional representation of the traces for every cluster.
+        """
         with torch.no_grad():
             X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
             
@@ -169,6 +181,9 @@ class autoencoder_gaussianMixture():
         With this new representation and based on the feature space separation, it 
         assigns a label to every sample.
 
+        .. warning::
+            The function requires initial `fit` to work.
+
         Parameters
         ----------
         X : numpy.array
@@ -198,6 +213,8 @@ class autoencoder_gaussianMixture():
         ----------
         X : numpy.array
             Array containing all the samples.
+        threshold : float
+            Value used to reject traces with too low reconstruction errors.
 
         Returns
         -------

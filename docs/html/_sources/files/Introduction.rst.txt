@@ -1,0 +1,17 @@
+Introduction
+============
+
+Single photon event classification for transition edge sensor signals.
+The entire process is an unsupervised process based on dimensionality reduction 
+using an autoencoder and labeling using gaussian mixture and kernel density estimation.
+
+The :ref:`AutoencoderAPI` offers a high-level API based on widely used libraries such as
+`Pytorch <https://pytorch.org/>`_, `Scikit-learn <https://scikit-learn.org/stable/#>`_ 
+and `Numpy <https://numpy.org/>`_. 
+The API allows the user to create different autoencoder architectures and train them.
+The trained networks can be stored and initialized for direct implementation 
+to signal analysis scripts.
+
+
+
+

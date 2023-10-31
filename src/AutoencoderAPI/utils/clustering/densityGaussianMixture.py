@@ -10,7 +10,24 @@ from sklearn.model_selection import GridSearchCV
 
 
 class density_gaussianMixture():
+    """
+    Use Kernel density estimation to initialize Gaussian mixture process that separates the latent space into regions
+    of high density associated with photon events.
 
+    Parameters
+    ----------
+    X_low : numpy.array
+        Array containing all the samples in their low-dimensional representation.
+    cluster_max : float
+        Maximum number of clusters to consider in the Bayesian Gaussian Mixture.
+    flip : bool
+        If `True` flips the latent space. This can be used to re-order the labels (right to left). 
+
+    Returns
+    -------
+    None
+
+    """
     def __init__(self, X_low, 
                  bw = (-5, -2, 20), 
                  bins_plot = 5000,
@@ -68,11 +85,19 @@ class density_gaussianMixture():
 
 
     def predict(self, X_low):
-        #if self.flip:
-            #X_low = -1*X_low
-        #labels = self.predict_(X_low)
-        #labels = np.array([self.mapping[i] for i in labels])
-        #return labels
+        """
+        Predict the label of samples in `X_low` based on initial latent space separation.
+
+        Parameters
+        ----------
+        X_low : numpy.array
+            Array containing all the samples in their low-dimensional representation.
+
+        Returns
+        -------
+        None
+
+        """
         if self.flip:
             X_low = -1*X_low
         return torch.searchsorted(self.mins, X_low)
@@ -83,7 +108,7 @@ class density_gaussianMixture():
     def plot_cluster(self):
         """
         Plot a histogram of the samples in the latent space.
-        Each sample is also labels using the kernel density estimation.
+        Each sample is also labeled using the kernel density estimation.
 
         Parameters
         ----------
@@ -117,9 +142,9 @@ class density_gaussianMixture():
         #plt.savefig('cluster.svg',format="svg", transparent=True)
 
 
-    def plot_traces(self, X, xlim=None):
+    def plot_traces(self, X):
         """
-        Plot the traces `X` and labels them by following the order of the low-dimensional representation
+        Plot the traces `X` and label them by following the order of the low-dimensional representation
         given in the initialization process.  
 
         Parameters
@@ -146,9 +171,6 @@ class density_gaussianMixture():
 
                 for i, _ in enumerate(cluster):
                     plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -156,7 +178,7 @@ class density_gaussianMixture():
         #plt.savefig('traces.svg',format="svg", transparent=True)
 
 
-    def plot_traces_average(self, X, xlim=None):
+    def plot_traces_average(self, X):
         """
         Plot the traces average and labels them by following the order of the low-dimensional representation
         given in the initialization process.  
@@ -184,9 +206,6 @@ class density_gaussianMixture():
                     cluster = cluster[:1000]
 
                 plt.plot(np.mean(cluster, axis=0), c=c)
-                    
-            if xlim != None:
-                plt.xlim(xlim[0],xlim[1])
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")

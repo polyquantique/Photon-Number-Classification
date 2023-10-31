@@ -8,7 +8,7 @@ from .setup.networks.autoencoder import build_autoencoder
 class autoencoder_bayesianGaussianMixture():
     """
     Load an autoencoder model for dimensionality reduction.
-    The feature space is separated for labelling using Gaussian mixture.
+    The feature space is separated for labelling using Bayesian Gaussian mixture.
 
     Parameters
     ----------
@@ -38,52 +38,45 @@ class autoencoder_bayesianGaussianMixture():
         
     
     def fit(self, X,  
-                plot_silhouette = False,
                 plot_cluster = False, 
                 plot_traces = False,
                 plot_traces_average = False, 
                 cluster_max = 10, 
                 flip = False,
                 filter_input = False,
-                filter_threshold = 0.0005,
-                cluster_xlim = None,
-                traces_xlim = None):
+                filter_threshold = 0.0005):
         """
         Use the loaded autoencoder to transform the input data into a 
         low-dimensional representation. The labels are assigned to the samples by
-        using kernel density estimation to separate the low-dimensional space.
+        using Bayesian Gaussian Mixture to separate the low-dimensional space.
         
         After the feature space is separated, the `get_label` function can 
         be used directly to predict new samples.
 
         If desired a variety of parameters can be plotted :
 
-        - Kernel density estimation over the feature space.
         - Histogram of these samples in the feature space with their labels.
         - Labelled input traces. 
+        - Input traces average of every cluster.
         
         Parameters
         ----------
         X : numpy.array
             Array containing all the samples.
-        plot_density : bool
-            If `True` plot the kernel density estimation over the feature space.
         plot_cluster : bool 
             If `True` plot the histogram of these samples in the feature space with their labels.
         plot_traces : bool
             If `True` plot the labelled input traces.
-        bw : tuple or numpy.array
-            If bw is a tuple, it represents the parameters inside np.logspace(*bw).
-            Otherwise, an array can be used, this represents an array containing all 
-            the possible bandwidth used in the kernel density estimation.
+        plot_traces_average : bool
+            If `True` plot the input traces average of every cluster
+        cluster_max : int
+            Maximum number of cluster to evaluate in the Bayesian gaussian Mixture.
         flip : bool
             flips the feature space to inverse le labels ordering.
-        cluster_xlim : tuple
-            The limits of the horizontal axis when plotting the clusters. Follows the structure (min,max).
-        traces_xlim : tuple
-            The limits of the horizontal axis when plotting the traces. Follows the structure (min,max).
-        skip : int
-            Skip a number of elements to define the feature space separation following the [::skip] structure.
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
 
         Returns
         -------
@@ -111,14 +104,12 @@ class autoencoder_bayesianGaussianMixture():
 
         sgm = bayesian_gaussianMixture(X_low_dim, cluster_max, flip=flip)
             
-        if plot_silhouette:
-            sgm.plot_silhouette()
         if plot_cluster:
-            sgm.plot_cluster(cluster_xlim)
+            sgm.plot_cluster()
         if plot_traces:
-            sgm.plot_traces(X, traces_xlim)
+            sgm.plot_traces(X)
         if plot_traces_average:
-            sgm.plot_traces_average(X, traces_xlim)
+            sgm.plot_traces_average(X)
 
         self.predict = sgm.predict
         self.labels = sgm.labels
@@ -127,7 +118,29 @@ class autoencoder_bayesianGaussianMixture():
     def get_clusters(self, X, 
                      filter_input = False, 
                      filter_threshold = 0.0005):
+        """
+        Sort the traces and their low dimensional representation based on initial fit.
 
+        .. warning::
+            The function requires initial `fit` to work.
+        
+        Parameters
+        ----------
+        X : numpy.array
+            Array containing all the samples.
+        filter_input : bool
+            If `True` filter the traces by evaluating the reconstruction error of the autoencoder following the `filter_threshold`.
+        filter_threshold : float
+            Value used to reject traces with too low reconstruction errors.
+  
+
+        Returns
+        -------
+        clusters_traces : list
+            List of numpy arrays containing the traces for every cluster.
+        clusters_low_dim : list
+            List of numpy arrays containg the low dimensional representation of the traces for every cluster.
+        """
         with torch.no_grad():
             X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
             
@@ -164,6 +177,9 @@ class autoencoder_bayesianGaussianMixture():
         With this new representation and based on the feature space separation, it 
         assigns a label to every sample.
 
+        .. warning::
+            The function requires initial `fit` to work.
+
         Parameters
         ----------
         X : numpy.array
@@ -195,6 +211,8 @@ class autoencoder_bayesianGaussianMixture():
         ----------
         X : numpy.array
             Array containing all the samples.
+        threshold : float
+            Value used to reject traces with too low reconstruction errors.
 
         Returns
         -------

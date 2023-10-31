@@ -1,0 +1,5 @@
+bayesianGaussianMixture
+-----------------------
+
+.. autoclass:: AutoencoderAPI.utils.clustering.bayesianGaussianMixture.bayesian_gaussianMixture
+   :members:
