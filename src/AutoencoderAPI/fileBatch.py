@@ -57,7 +57,7 @@ class fileBatch:
         folder = f"{config['files']['dataset']}"
         files = listdir(folder)
 
-        fold = KFold(n_splits=10,shuffle=True,random_state=42) #config['train']['k-fold']
+        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42) #config['train']['k-fold']
         train_validation_files, test_files = train_test_split(files,train_size=0.9,shuffle=True)
         splits = fold.split(train_validation_files)
 

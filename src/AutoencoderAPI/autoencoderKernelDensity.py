@@ -206,7 +206,6 @@ class autoencoder_kernelDensity():
             X_low_dim, X_reconst = self.network(X_pytorch, both=True)
             
             X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
             labels = self.fit_(X_low_dim)

@@ -51,9 +51,9 @@ using kernel density estimation (:ref:`kernelDensity`).
 The *fit* function can plot a variety of parameters to garantee the different 
 algorithms are working properly.
 
-- plot_density : Kernel density estimation over the feature space.
 - plot_cluster : Histogram of these samples in the feature space with their labels.
 - plot_traces : Labelled input traces. 
+- plot_average : Average of the input traces for every cluster.
 
 To demonstrate the functionalities all plots are generated in this example.
 
@@ -61,14 +61,13 @@ To demonstrate the functionalities all plots are generated in this example.
 
         ak.fit(X_train, plot_density=True, plot_cluster=True, plot_traces=True, bw_cst=[0.01])
 
-
-.. image:: Images/density.png
-        :width: 600
-
 .. image:: Images/feature.png
         :width: 600
 
 .. image:: Images/traces.png
+        :width: 600
+
+.. image:: Images/average.png
         :width: 600
 
 
@@ -101,8 +100,8 @@ Expected output :
 
 .. code-block:: python
 
-        Number of traces :  143360
-        Number of traces per second :  2386326
+        Number of traces :  71680
+        Number of traces per second :  2686858
 
 
 .. image:: Images/distribution.png

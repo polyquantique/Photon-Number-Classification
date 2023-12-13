@@ -162,7 +162,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../Requirements.html">Requirements</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../AutoencoderAPI.html">AutoencoderAPI</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of AutoencoderAPI</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../API/recurrentTriplet.html">recurrentTripletKernel</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../API/autoencoderKernelDensity.html">autoencoderKernelDensity</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../API/fileBatch.html">fileBatch</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../API/sweep.html">sweep</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../API/setup.html">setup</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of setup</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -200,6 +199,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../API/utils/compare.html">compare</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="../API/autoencoderGaussianMixture.html">autoencoderGaussianMixture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../API/autoencoderBayesianGaussianMixture.html">autoencoderBayesianGaussianMixture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../API/autoencoderKernelDensity.html">autoencoderKernelDensity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../API/autoencoderKmeans.html">autoencoderKmeans</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../Tutorial.html">Tutorial</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><div class="visually-hidden">Toggle navigation of Tutorial</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
@@ -290,17 +293,17 @@ using kernel density estimation (<a class="reference internal" href="../API/util
 <p>The <em>fit</em> function can plot a variety of parameters to garantee the different
 algorithms are working properly.</p>
 <ul class="simple">
-<li><p>plot_density : Kernel density estimation over the feature space.</p></li>
 <li><p>plot_cluster : Histogram of these samples in the feature space with their labels.</p></li>
 <li><p>plot_traces : Labelled input traces.</p></li>
+<li><p>plot_average : Average of the input traces for every cluster.</p></li>
 </ul>
 <p>To demonstrate the functionalities all plots are generated in this example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ak</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">plot_density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot_cluster</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot_traces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bw_cst</span><span class="o">=</span><span class="p">[</span><span class="mf">0.01</span><span class="p">])</span>
 </pre></div>
 </div>
-<a class="reference internal image-reference" href="../../_images/density.png"><img alt="../../_images/density.png" src="../../_images/density.png" style="width: 600px;" /></a>
 <a class="reference internal image-reference" href="../../_images/feature.png"><img alt="../../_images/feature.png" src="../../_images/feature.png" style="width: 600px;" /></a>
 <a class="reference internal image-reference" href="../../_images/traces.png"><img alt="../../_images/traces.png" src="../../_images/traces.png" style="width: 600px;" /></a>
+<a class="reference internal image-reference" href="../../_images/average.png"><img alt="../../_images/average.png" src="../../_images/average.png" style="width: 600px;" /></a>
 </section>
 <section id="predict-new-samples">
 <h2>Predict new samples<a class="headerlink" href="#predict-new-samples" title="Link to this heading">#</a></h2>
@@ -323,8 +326,8 @@ demonstrates the use of the <em>get_label</em> function and the time required to
 </pre></div>
 </div>
 <p>Expected output :</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Number</span> <span class="n">of</span> <span class="n">traces</span> <span class="p">:</span>  <span class="mi">143360</span>
-<span class="n">Number</span> <span class="n">of</span> <span class="n">traces</span> <span class="n">per</span> <span class="n">second</span> <span class="p">:</span>  <span class="mi">2386326</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Number</span> <span class="n">of</span> <span class="n">traces</span> <span class="p">:</span>  <span class="mi">71680</span>
+<span class="n">Number</span> <span class="n">of</span> <span class="n">traces</span> <span class="n">per</span> <span class="n">second</span> <span class="p">:</span>  <span class="mi">2686858</span>
 </pre></div>
 </div>
 <a class="reference internal image-reference" href="../../_images/distribution.png"><img alt="../../_images/distribution.png" src="../../_images/distribution.png" style="width: 600px;" /></a>

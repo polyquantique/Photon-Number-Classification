@@ -2,7 +2,7 @@ from os import makedirs, listdir
 import numpy as np
 from datetime import datetime
 from tqdm.notebook import tqdm
-
+from warnings import warn
 import torch
 
 from .setup.networks.autoencoder import build_autoencoder
@@ -61,11 +61,9 @@ class recurrentTriplet():
         X = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
         if skip > 1: 
             X = X[:, ::skip]
-            X= X[:,:int(size / skip)]
+            X = X[:,:int(size / skip)]
         else : skip = 1
 
-        
-        
         data = torch.from_numpy(X).view(-1, 1, int(size / skip)).float().to(self.device)
 
         return data, log_path
@@ -137,7 +135,14 @@ class recurrentTriplet():
             X_low_dim = network(X, encoding=True)
             X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
+            min_ = np.min(X_low_dim)
+            max_ = np.max(X_low_dim)
+
+            X_low_dim = X_low_dim - min_ /(max_ - min_)
             cl = kernel_density(X_low_dim, bw)
+
+            if len(np.unique(cl.labels)) == 1:
+                warn('One class detected : bw_cst might be too large')
 
             return cl.labels
 
@@ -180,7 +185,7 @@ class recurrentTriplet():
         criterion = build_criterion(config)
         optimizer = build_optimizer(network, config)
 
-        for epoch in tqdm(range(4) , desc="Epoch MSE"):
+        for epoch in tqdm(range(6) , desc="Epoch MSE"):
             train_loss = train_MSE(network, data[train_index], optimizer, criterion)
         
         

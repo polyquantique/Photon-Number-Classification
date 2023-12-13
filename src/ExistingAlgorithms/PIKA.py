@@ -12,9 +12,11 @@ from scipy.signal import savgol_filter, wiener
 
 
 class PIKA():
-
+    
     def __init__(self, config):
-
+        """
+        TODO : Finish implementation
+        """
         # Dataset 
         self.folder = config['Dataset_path']
         self.size = config['Dataset_signal_size']

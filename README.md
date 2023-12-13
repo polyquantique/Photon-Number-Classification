@@ -43,6 +43,19 @@ Neural networks allow for a wide variety of architectures and therefore their ev
 - Pytorch dataset classs structure for batching and true random.
 - Test GPU functionalities of pytorch
 - Modify Log structure to reduce the storing and change it to computing when loading results.
+- Implementation of confidence measure 
+    - [1] T. Schapeler et al., ‘How well can superconducting nanowire single-photon detectors resolve photon number?’, arXiv.org. Accessed: Nov. 21, 2023. [Online]. Available: https://arxiv.org/abs/2310.12471v2
+    - [2] P. C. Humphreys, B. J. Metcalf, T. Gerrits, T. Hiemstra, A. E. Lita, J. Nunn, S. W. Nam, A. Datta, W. S. Kolthammer, and I. A. Walmsley, Tomography of photon-number resolving continuous-output detectors, New Journal of Physics 17, 103044 (2015).
+- Implementation of Voigt profiles and Cross talk between photon-number clusters
+    - [1] G. Sauer, M. Kolarczik, R. Gomez, J. Conrad, and F. Steinlechner, ‘Resolving Photon Numbers Using Ultra-High-Resolution Timing of a Single Low-Jitter Superconducting Nanowire Detector’. arXiv, Oct. 19, 2023. doi: 10.48550/arXiv.2310.12472.
+
+- Prediction histogram/trace/mean traces plot
+- Flexible dataset import
+    - Non normalized files
+    - Batching
+    - Various file types
+- Automatic method comparison
+
 
 ## ACKNOWLEDGMENTS
 

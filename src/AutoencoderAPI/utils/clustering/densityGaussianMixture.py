@@ -2,10 +2,12 @@ import numpy as np
 import torch
 from scipy.signal import argrelextrema
 import matplotlib.pyplot as plt 
+from matplotlib import colors
 from matplotlib.pyplot import cm
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
+from math import erf, sqrt
 
 
 
@@ -29,59 +31,48 @@ class density_gaussianMixture():
 
     """
     def __init__(self, X_low, 
-                 bw = (-5, -2, 20), 
+                 bw = [0.01], 
                  bins_plot = 5000,
                  flip = False, 
                  skip = 1):
-
-        if flip:
-            X_low = -1*X_low
-        if skip < 2:
-            skip = 1
-
-        X_low = np.array(X_low).reshape(-1,1)
-        self.min_ = np.min(X_low)
-        self.max_ = np.max(X_low)
-
-        params = {"bandwidth": bw}
-        grid = GridSearchCV(KernelDensity(), params).fit(X_low[::skip])
-        kd = grid.best_estimator_
-
-        self.space = np.linspace(self.min_, self.max_, 2*bins_plot).reshape(-1,1)
-        self.density = kd.score_samples(self.space)
-        self.maxs = self.space[argrelextrema(self.density, np.greater)[0]].reshape(-1,1)
-        self.mins = torch.tensor(self.space[argrelextrema(self.density, np.less)[0]].flatten())
-
-        bgm = GaussianMixture(n_components=len(self.maxs), tol=1e-3, max_iter=100, means_init=self.maxs)
-        fit_ = bgm.fit(X_low)
-
-        # Map labels based on their position in latent space
-        cluster_means = fit_.means_
-        cluster_covariance = fit_.covariances_
-        weights = fit_.weights_
-        labels = fit_.predict(X_low)
-
-        #Sort labels/means
-        unique_labels = range(len(cluster_means))
-        centroids, mapping = zip(*sorted(zip(cluster_means, unique_labels)))
-        sorted_labels = np.array([mapping[i] for i in labels])
+        
+        self.flip = -1 if flip else 1
+        X_low = self.flip * np.array(X_low).reshape(-1,1)
+        if skip < 2: skip = 1
+        kd = GridSearchCV(KernelDensity(), {"bandwidth": bw}).fit(X_low[::skip]).best_estimator_
 
         self.style_name = "seaborn-v0_8"
+        self.min_ = np.min(X_low)
+        self.max_ = np.max(X_low)
+        self.bins = np.linspace(self.min_, self.max_, bins_plot)
+        self.density = kd.score_samples(self.bins.reshape(-1,1))
+        self.maxs = self.bins[argrelextrema(self.density, np.greater)[0]].reshape(-1,1)
+        self.mins = torch.tensor(self.bins[argrelextrema(self.density, np.less)[0]].flatten())
+
+        fit_ = GaussianMixture(n_components=len(self.maxs), 
+                               tol=1e-3, 
+                               max_iter=100, 
+                               means_init=self.maxs).fit(X_low)
+
+        # Map labels based on their position in latent space
+        self.cluster_means = fit_.means_
+        self.cluster_covariance = fit_.covariances_
+        self.weights = fit_.weights_
+        self.labels = fit_.predict(X_low)
+        self.predict_ = fit_.predict
+
+        #Sort labels/means
+        unique_labels = range(len(self.cluster_means))
+        centroids, self.mapping = zip(*sorted(zip(self.cluster_means, unique_labels)))
+        #sorted_labels = np.array([self.mapping[i] for i in self.labels])
+
         self.clusters_low = []
         self.condition = []
-        for label in mapping:
-            condition = labels == label
+        for label in self.mapping:
+            condition = self.labels == label
             self.clusters_low.append(X_low.flatten()[condition])
             self.condition.append(condition)
-
-        self.bins = np.linspace(min(X_low), max(X_low), bins_plot).reshape(-1)
-        self.cluster_means = cluster_means
-        self.cluster_covariance = cluster_covariance
-        self.weights = weights
-        self.labels = sorted_labels
-        self.predict_ = fit_.predict
-        self.flip = flip
-        self.mapping = mapping
+  
 
 
     def predict(self, X_low):
@@ -98,12 +89,42 @@ class density_gaussianMixture():
         None
 
         """
-        if self.flip:
-            X_low = -1*X_low
+        X_low = self.flip * X_low
         return torch.searchsorted(self.mins, X_low)
+    
+
      
-    
-    
+    def plot_cross_talk(self):
+
+        sig = self.cluster_covariance
+        u = self.cluster_means
+
+        num_distributions = len(u)
+        crossTalk = np.zeros((num_distributions, num_distributions))
+
+        for i in range(num_distributions):
+            for j in range(i+1):
+                if i==j:
+                    crossTalk[j][i] = 1
+                else:
+                    u1 = u[j]
+                    sig1 = sqrt(sig[j])
+                    u2 = u[i]
+                    sig2 = sqrt(sig[i])
+
+                    c = (u2*sig1**2 - sig2*(u1*sig2 + sig1*np.sqrt((u1-u2)**2 + 2*(sig1**2-sig2**2)*np.log(sig1/sig2))))/(sig1**2 - sig2**2)
+                    crossTalk[j][i] = 1 - (1/2)*erf((c-u1)/(sqrt(2)*sig1)) + (1/2)*erf((c-u2)/(sqrt(2)*sig2))
+
+        crossTalk = crossTalk + crossTalk.T - np.diagflat(np.ones((num_distributions)))
+
+        #with plt.style.context(self.style_name):
+        #plt.figure(figsize=(10,4)) #, dpi=100
+        
+        #print(crossTalk)
+        im = plt.imshow(crossTalk, cmap="GnBu_r")#, norm=colors.LogNorm())
+        plt.colorbar(im)
+        plt.show()
+        
 
     def plot_cluster(self):
         """
@@ -165,10 +186,7 @@ class density_gaussianMixture():
             for condition in self.condition:
                 cluster = X[condition]
                 c = next(color)
-
-                if len(cluster) > 1000:
-                    cluster = cluster[:1000]
-
+                if len(cluster) > 1000: cluster = cluster[:1000]
                 for i, _ in enumerate(cluster):
                     plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
 
@@ -201,10 +219,7 @@ class density_gaussianMixture():
             for condition in self.condition:
                 cluster = X[condition]
                 c = next(color)
-
-                if len(cluster) > 1000:
-                    cluster = cluster[:1000]
-
+                if len(cluster) > 1000: cluster = cluster[:1000]
                 plt.plot(np.mean(cluster, axis=0), c=c)
 
             plt.xlabel("Time (a.u.)")

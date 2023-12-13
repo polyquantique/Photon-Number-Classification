@@ -40,9 +40,12 @@ class autoencoder_gaussianMixture():
     
     def fit(self, X,  
                 plot_cluster = False, 
+                bins_plot = 5000,
                 plot_traces = False,
-                plot_traces_average = False, 
+                plot_traces_average = False,
+                plot_cross_talk = False,
                 bw_cst = [0.008], 
+                skip = 1,
                 flip = False,
                 filter_input = False,
                 filter_threshold = 0.0005):
@@ -64,16 +67,20 @@ class autoencoder_gaussianMixture():
         ----------
         X : numpy.array
             Array containing all the samples.
-        plot_density : bool
-            If `True` plot the kernel density estimation over the feature space.
         plot_cluster : bool 
             If `True` plot the histogram of these samples in the feature space with their labels.
+        bins_plot : int 
+            Number of bins for the cluster plot.
         plot_traces : bool
             If `True` plot the labelled input traces.
+        plot_traces : bool
+            If `True` plot the labelled input traces average for every cluster.
         bw_cst : tuple or numpy.array
             If bw is a tuple, it represents the parameters inside np.logspace(*bw).
             Otherwise, an array can be used, this represents an array containing all 
             the possible bandwidth used in the kernel density estimation.
+        skip : int
+            Number of skip for the kernel density estimation step (folowing the X[skip::] notation)
         flip : bool
             flips the feature space to inverse le labels ordering.
         filter_input : bool
@@ -106,17 +113,23 @@ class autoencoder_gaussianMixture():
                 X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
         #sgm = silhouette_gaussianMixture(X_low_dim, cluster_interval, flip=flip)
-        sgm = density_gaussianMixture(X_low_dim, bw_cst, flip=flip)
+        dgm = density_gaussianMixture(X_low_dim, 
+                                      bw = bw_cst, 
+                                      bins_plot = bins_plot,
+                                      flip=flip,
+                                      skip=skip)
             
         if plot_cluster:
-            sgm.plot_cluster() #cluster_xlim
+            dgm.plot_cluster() #cluster_xlim
         if plot_traces:
-            sgm.plot_traces(X)
+            dgm.plot_traces(X)
         if plot_traces_average:
-            sgm.plot_traces_average(X)
+            dgm.plot_traces_average(X)
+        if plot_cross_talk:
+            dgm.plot_cross_talk()
 
-        self.predict = sgm.predict
-        self.labels = sgm.labels
+        self.predict = dgm.predict
+        self.labels = dgm.labels
 
 
     def get_clusters(self, X, 
@@ -150,29 +163,25 @@ class autoencoder_gaussianMixture():
             
             if filter_input:
                 X_low_dim, X_reconst = self.network(X_pytorch, both=True)
-            
-                X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
-                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
-
-                MSE = ((X - X_reconst)**2).mean(axis=1)
+        
+                MSE = torch.mean((X_pytorch - X_reconst)**2, 2)
                 condition = MSE < filter_threshold
 
                 X_low_dim = X_low_dim[condition]
-                X = X[condition]
+                X_pytorch = X_pytorch[condition]
             else:
                 X_low_dim = self.network(X_pytorch, encoding=True)
-                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
-        labels = self.predict(X_low_dim)
+        labels = self.predict(X_low_dim).flatten()
         clusters_traces = []
         clusters_low_dim = []
 
         for number in self.labels:
             condition = labels == number
-            clusters_traces.append(X[condition])
-            clusters_low_dim.append(X_low_dim[condition])
+            clusters_traces.append(X_pytorch.view(-1)[condition])
+            clusters_low_dim.append(X_low_dim.view(-1)[condition])
 
-        return clusters_traces, clusters_low_dim
+        return labels#clusters_traces, clusters_low_dim
         
 
     def get_label(self, X):
@@ -226,9 +235,7 @@ class autoencoder_gaussianMixture():
         self.network.eval()
         with torch.no_grad():
             X_low_dim, X_reconst = self.network(X_pytorch, both=True)
-            
             X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
             labels = self.predict(X_low_dim)
