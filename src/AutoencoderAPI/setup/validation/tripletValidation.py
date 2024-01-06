@@ -53,12 +53,11 @@ def validation(alpha, network, X, criterion, cluster_label, store=False):
                 encode = network(data, encoding=True)
                 decode = network(encode, decoding =True)
 
-                save_encode = torch.clone(encode).numpy()
-                results['encode'].append(save_encode[0,0])
+                results['encode'].append(encode.cpu().clone().numpy()[0,0])
 
                 if index < 2:
-                    results['input'].append(data.clone().view(-1).numpy())
-                    results['decode'].append(decode.clone().view(-1).numpy())
+                    results['input'].append(data.cpu().clone().view(-1).numpy())
+                    results['decode'].append(decode.cpu().clone().view(-1).numpy())
 
             else:
                 decode = network(data)

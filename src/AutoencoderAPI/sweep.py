@@ -13,7 +13,7 @@ class sweep:
         pass
 
 
-    def grid_search(self, name, run_config, sweep_config):
+    def grid_search(self, run_config, sweep_config):
         """
         # Sweep 
 
@@ -21,8 +21,6 @@ class sweep:
 
         Parameters
         ----------
-        - name : str
-                - Name of the folder created to store the runs.
         - run_config : dict
                 - Dictionary containing the run parameters.
         - sweep_config : dict
@@ -57,8 +55,7 @@ class sweep:
     
     def random_search(self, run_config, sweep_config, sweep_number):
         """
-        TODO
-        update to current structure
+        
         
         """
         path_save = run_config['files']['path_save']

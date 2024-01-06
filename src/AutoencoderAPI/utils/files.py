@@ -77,3 +77,17 @@ def save_all(log_path, network, results, loss, config):
     save_object(results , f"{log_path}/results")
     save_object(loss , f"{log_path}/loss")
     save_object(config, f"{log_path}/log")
+
+# Function specific import
+import zipfile
+import os
+
+def open_zip(files, folder_path):
+
+    with zipfile.ZipFile(folder_path) as z:
+        for filename in files:
+            if not os.path.isdir(filename):
+                # read the file
+                with z.open(filename) as f:
+                    for line in f:
+                        print(line)

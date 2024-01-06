@@ -42,12 +42,13 @@ class density_gaussianMixture():
         kd = GridSearchCV(KernelDensity(), {"bandwidth": bw}).fit(X_low[::skip]).best_estimator_
 
         self.style_name = "seaborn-v0_8"
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.min_ = np.min(X_low)
         self.max_ = np.max(X_low)
         self.bins = np.linspace(self.min_, self.max_, bins_plot)
         self.density = kd.score_samples(self.bins.reshape(-1,1))
         self.maxs = self.bins[argrelextrema(self.density, np.greater)[0]].reshape(-1,1)
-        self.mins = torch.tensor(self.bins[argrelextrema(self.density, np.less)[0]].flatten())
+        self.mins = torch.tensor(self.bins[argrelextrema(self.density, np.less)[0]].flatten()).to(self.device)
 
         fit_ = GaussianMixture(n_components=len(self.maxs), 
                                tol=1e-3, 

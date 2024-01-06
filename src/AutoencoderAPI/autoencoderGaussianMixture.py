@@ -27,15 +27,15 @@ class autoencoder_gaussianMixture():
         network = build_autoencoder(config_load)
         network.load_state_dict(torch.load(f"{model_path}/model.pt"))
         
-        if config_load['train']['skip_elements'] <= 1:
-            self.size = config_load['files']['input_dimension']
-        else:
-            self.size = int(config_load['files']['input_dimension'] / config_load['train']['skip_elements'])
+        self.size_network = config_load['internal']['size_network']
 
-        self.network = network
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.network = network.to(self.device)
         self.config_load = config_load
         self.predict = None
         self.labels = None
+        self.cluster_means = None
+        self.cluster_covariance = None
         
     
     def fit(self, X,  
@@ -94,14 +94,14 @@ class autoencoder_gaussianMixture():
         """
         self.network.eval()
         with torch.no_grad():
-            X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
+            X_pytorch = torch.from_numpy(X).view(-1, 1, self.size_network).float().to(self.device)
             
 
             if filter_input:
                 X_low_dim, X_reconst = self.network(X_pytorch, both=True)
             
-                X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
-                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+                X_reconst = X_reconst.cpu().numpy().reshape(-1, self.size_network)
+                X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 1)
 
                 MSE = ((X - X_reconst)**2).mean(axis=1)
                 condition = MSE < filter_threshold
@@ -110,9 +110,8 @@ class autoencoder_gaussianMixture():
                 X = X[condition]
             else:
                 X_low_dim = self.network(X_pytorch, encoding=True)
-                X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+                X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 1)
 
-        #sgm = silhouette_gaussianMixture(X_low_dim, cluster_interval, flip=flip)
         dgm = density_gaussianMixture(X_low_dim, 
                                       bw = bw_cst, 
                                       bins_plot = bins_plot,
@@ -120,7 +119,7 @@ class autoencoder_gaussianMixture():
                                       skip=skip)
             
         if plot_cluster:
-            dgm.plot_cluster() #cluster_xlim
+            dgm.plot_cluster() 
         if plot_traces:
             dgm.plot_traces(X)
         if plot_traces_average:
@@ -130,6 +129,9 @@ class autoencoder_gaussianMixture():
 
         self.predict = dgm.predict
         self.labels = dgm.labels
+        self.cluster_means = dgm.cluster_means
+        self.cluster_covariance = dgm.cluster_covariance
+
 
 
     def get_clusters(self, X, 
@@ -159,7 +161,7 @@ class autoencoder_gaussianMixture():
             List of numpy arrays containg the low dimensional representation of the traces for every cluster.
         """
         with torch.no_grad():
-            X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
+            X_pytorch = torch.from_numpy(X).view(-1, 1, self.size_network).float().to(self.device)
             
             if filter_input:
                 X_low_dim, X_reconst = self.network(X_pytorch, both=True)
@@ -172,16 +174,16 @@ class autoencoder_gaussianMixture():
             else:
                 X_low_dim = self.network(X_pytorch, encoding=True)
 
-        labels = self.predict(X_low_dim).flatten()
+        labels = self.predict(X_low_dim).view(-1)
         clusters_traces = []
         clusters_low_dim = []
 
-        for number in self.labels:
+        for number in torch.unique(labels):
             condition = labels == number
-            clusters_traces.append(X_pytorch.view(-1)[condition])
-            clusters_low_dim.append(X_low_dim.view(-1)[condition])
+            clusters_traces.append(X_pytorch[condition].view(-1).cpu())
+            clusters_low_dim.append(X_low_dim[condition].view(-1).cpu())
 
-        return labels#clusters_traces, clusters_low_dim
+        return clusters_low_dim #clusters_traces, clusters_low_dim
         
 
     def get_label(self, X):
@@ -204,11 +206,11 @@ class autoencoder_gaussianMixture():
             Array containing the labels of the input samples.
 
         """
-        X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
+        X_pytorch = torch.from_numpy(X).view(-1, 1, self.size_network).float().to(self.device)
         self.network.eval()
         with torch.no_grad():
             X_low_dim = self.network(X_pytorch, encoding=True)
-        return self.predict(X_low_dim).flatten()
+        return self.predict(X_low_dim).flatten().cpu()
 
     
 
@@ -217,6 +219,9 @@ class autoencoder_gaussianMixture():
         Transform samples into a low-dimensional space using the predefined autoencoder.
         With this new representation and based on the feature space separation, it 
         assigns a label to every sample.
+
+        .. warning::
+            The function requires initial `fit` to work.
 
         Parameters
         ----------
@@ -231,13 +236,13 @@ class autoencoder_gaussianMixture():
             Array containing the labels of the input samples.
 
         """
-        X_pytorch = torch.from_numpy(X).view(-1, 1, self.size).float()
+        X_pytorch = torch.from_numpy(X).view(-1, 1, self.size_network).float().to(self.device)
         self.network.eval()
         with torch.no_grad():
             X_low_dim, X_reconst = self.network(X_pytorch, both=True)
-            X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
+            X_reconst = X_reconst.cpu().numpy().reshape(-1, self.size_network)
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
             labels = self.predict(X_low_dim)
 
-        return labels[MSE < threshold]
+        return labels[MSE < threshold].cpu()

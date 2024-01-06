@@ -55,6 +55,7 @@ Neural networks allow for a wide variety of architectures and therefore their ev
     - Batching
     - Various file types
 - Automatic method comparison
+- Unbalanced dataset option
 
 
 ## ACKNOWLEDGMENTS

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import numpy as np
 from os import listdir
 from .files import open_object
@@ -8,7 +9,11 @@ from .clustering.kernelDensity import kernel_density
 
 warnings.filterwarnings("ignore")
 
-def load_run_results(file_name, bw = (-5, -2, 20)):
+def load_run_results(file_name, 
+                     bw = (-5, -2, 20), 
+                     clustering = False , 
+                     print_network = False,
+                     print_train = False):
     """
     Load a `run` folder to plot the dimensionality reduction output, the losses, an input compared 
     to the autoencoder output and cluster labelling using kernel density estimation . 
@@ -30,13 +35,29 @@ def load_run_results(file_name, bw = (-5, -2, 20)):
     with plt.style.context("seaborn-v0_8"):
         for index_fold, fold in enumerate(listdir(path)):
 
+            if any([print_network, print_train]):
+                log = open_object(f"{path}/{fold}/log.bin")
+
+            if print_network:
+                print(log['network'])
+
+            if print_train:
+                print(log['train'])
+
             fig, axs = plt.subplots(3,1,figsize=(10,10))
 
             results = open_object(f"{path}/{fold}/results.bin")
+            results_encode = np.array(results['encode'])
+            mean_ = np.mean(results_encode)
+            std_ = np.std(results_encode)
 
-            kd = kernel_density(np.array(results['encode']), bw)
-            clusters = kd.clusters_low
-            bins = np.linspace(min(results['encode']), max(results['encode']), 10_000).flatten()
+            if clustering:
+                kd = kernel_density((results_encode-mean_)/std_, bw)
+                clusters = kd.clusters_low
+            else:
+                clusters = [results_encode]
+            
+            bins = np.linspace(min(results_encode), max(results_encode), 10_000).flatten()
 
             for index_cluster, cluster in enumerate(clusters):
                 axs[0].hist(cluster.flatten() , bins, alpha = 0.5, label=f"{index_cluster}",histtype='step', fill=True)
@@ -80,49 +101,55 @@ def load_sweep_results(file_name, parameters):
     - None
 
     """
-    path = f"Autoencoder Log/{file_name}"
+    path = f"AutoencoderLog/{file_name}"
 
     parameter1 = []
     parameter2 = []
     loss_sweep = []
-    min_loss = 0#1
+    min_loss = 1#1
     
-    with plt.style.context("seaborn-v0_8"):
-        for sweep in sorted(listdir(path)):
-            loss_cum = 0
-            fold_list = sorted(listdir(f"{path}/{sweep}"))
-            fold_len = len(fold_list)
+    #with plt.style.context("seaborn-v0_8"):
+    for sweep in sorted(listdir(path)):
+        loss_cum = 0
+        fold_list = sorted(listdir(f"{path}/{sweep}"))
+        fold_len = len(fold_list)
 
-            for index, fold in enumerate(fold_list):
-                loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
-                loss_cum += loss['Silhouette']#['test_loss'][0]
+        for index, fold in enumerate(fold_list):
+            loss = open_object(f"{path}/{sweep}/{fold}/loss.bin")
+            loss_cum += min(loss['test_loss'])#['test_loss'][0]
 
-            config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
-            
-            parameter1.append(config_file['train'][parameters[0]])
-            parameter2.append(config_file['train'][parameters[1]])
-            loss_sweep.append(loss_cum / fold_len)
-
-            if loss_sweep[-1] > min_loss:   #< min_loss:
-                min_loss = loss_sweep[-1]
-                min_parameter1 = parameter1[-1]
-                min_parameter2 = parameter2[-1]
-
+        config_file = open_object(f"{path}/{sweep}/{fold}/log.bin")
         
-        x=np.unique(parameter1)
-        y=np.unique(parameter2)
-        X,Y = np.meshgrid(x,y)
-        print("min : ", min_loss)
-        print(f"{parameters[0]} : ", min_parameter1)
-        print(f"{parameters[1]} : ", min_parameter2)
+        parameter1.append(config_file['train'][parameters[0]])
+        parameter2.append(config_file['train'][parameters[1]])
+        loss_sweep.append(loss_cum / fold_len)
 
-        Z= np.array(loss_sweep).reshape(len(y),len(x))#np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
-        plt.xticks(np.arange(len(x)), labels=x)
-        plt.yticks(np.arange(len(y)), labels=y)
+        if loss_sweep[-1] < min_loss:   #< min_loss:
+            min_loss = loss_sweep[-1]
+            min_parameter1 = parameter1[-1]
+            min_parameter2 = parameter2[-1]
 
-        #plt.pcolormesh(X,Y,Z)
-        plt.imshow(Z)#, norm=colors.LogNorm(), interpolation="bilinear")
-        plt.xlabel(parameters[0])
-        plt.ylabel(parameters[1])
-        plt.colorbar()
-        plt.show()
+    
+    x=np.unique(parameter1)
+    y=np.unique(parameter2)
+    X,Y = np.meshgrid(x,y)
+    print("min : ", min_loss)
+    print(f"{parameters[0]} : ", min_parameter1)
+    print(f"{parameters[1]} : ", min_parameter2)
+
+    if len(loss_sweep) < len(y)*len(x):
+        loss_sweep.extend(np.zeros(len(y)*len(x)-len(loss_sweep)))
+    print(loss_sweep)  
+    Z= np.array(loss_sweep).reshape(len(y),len(x))#np.rot90(np.array(loss_sweep).reshape(len(y),len(x)))
+    plt.xticks(np.arange(len(x)), labels=x)
+    plt.yticks(np.arange(len(y)), labels=y)
+
+    #plt.pcolormesh(X,Y,Z)
+    plt.imshow(Z, norm=colors.LogNorm())#, interpolation="bilinear")
+    plt.xlabel(parameters[0])
+    plt.ylabel(parameters[1])
+    plt.colorbar()
+    plt.show()
+
+
+

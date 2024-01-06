@@ -2,7 +2,7 @@ from os import listdir
 import numpy as np
 
 
-def file_name_table(path, size, string_index):
+def file_name_table_bin(path, size, string_index):
 
     decibel_dict = {}
     for file_name in listdir(path):
@@ -17,4 +17,18 @@ def file_name_table(path, size, string_index):
 
     return decibel_dict
 
+
+def file_name_table_npy(path, size, string_index):
+
+    decibel_dict = {}
+    for file_name in listdir(path):
         
+        data = np.load(f"{path}/{file_name}").reshape(-1,size)
+        decibel = file_name[string_index[0]:string_index[1]]
+        
+        if decibel in decibel_dict.keys():
+            decibel_dict[decibel] = np.concatenate([decibel_dict[decibel], data])
+        else:
+            decibel_dict[decibel] = data
+
+    return decibel_dict
