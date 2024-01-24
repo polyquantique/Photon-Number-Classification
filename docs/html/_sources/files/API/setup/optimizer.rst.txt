@@ -1,5 +1,0 @@
-optimizer
----------
-
-.. autoclass:: AutoencoderAPI.setup.optimizer.build_optimizer
-   :members:

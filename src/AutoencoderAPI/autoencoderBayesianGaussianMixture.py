@@ -22,19 +22,18 @@ class autoencoder_bayesianGaussianMixture():
     """
     def __init__(self, model_path):
         
-        config_load = open_object(f"{model_path}/log.bin")
-        network = build_autoencoder(config_load)
-        network.load_state_dict(torch.load(f"{model_path}/model.pt"))
-        
-        if config_load['train']['skip_elements'] <= 1:
-            self.size = config_load['files']['input_dimension']
-        else:
-            self.size = int(config_load['files']['input_dimension'] / config_load['train']['skip_elements'])
-
-        self.network = network
-        self.config_load = config_load
+        self.config_load = open_object(f"{model_path}/log.bin")
+        self.network = build_autoencoder(self.config_load)
+        self.network.load_state_dict(torch.load(f"{model_path}/model.pt"))
         self.predict = None
         self.labels = None
+        
+        if self.config_load['train']['skip_elements'] <= 1:
+            self.size = self.config_load['files']['input_dimension']
+        else:
+            self.size = int(self.config_load['files']['input_dimension'] / self.config_load['train']['skip_elements'])
+
+        
         
     
     def fit(self, X,  
@@ -226,7 +225,6 @@ class autoencoder_bayesianGaussianMixture():
             X_low_dim, X_reconst = self.network(X_pytorch, both=True)
             
             X_reconst = X_reconst.detach().numpy().reshape(-1, self.size)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
 
             MSE = ((X - X_reconst)**2).mean(axis=1)
             labels = self.predict(X_low_dim)

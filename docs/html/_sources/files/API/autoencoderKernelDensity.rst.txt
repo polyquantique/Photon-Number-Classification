@@ -1,5 +1,0 @@
-autoencoderKernelDensity
-------------------------
-
-.. autoclass:: AutoencoderAPI.autoencoderKernelDensity.autoencoder_kernelDensity
-   :members:

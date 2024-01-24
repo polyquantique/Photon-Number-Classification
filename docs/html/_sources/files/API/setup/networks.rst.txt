@@ -1,9 +1,0 @@
-networks
---------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: networks:
-
-   networks/autoencoder
-   networks/transformerAutoencoder

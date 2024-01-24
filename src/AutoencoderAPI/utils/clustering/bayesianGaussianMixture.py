@@ -27,7 +27,10 @@ class bayesian_gaussianMixture():
     def __init__(self, X_low, cluster_max, flip=False):
 
         if flip:
+            self.flip = -1
             X_low = -1*X_low
+        else:
+            self.flip = 1
 
         X_low = np.array(X_low).reshape(-1,1)
 
@@ -58,7 +61,6 @@ class bayesian_gaussianMixture():
         self.cluster_covariance = cluster_covariance
         self.labels = sorted_labels
         self.predict_ = fit_.predict
-        self.flip = flip
         self.mapping = mapping
 
 
@@ -76,8 +78,7 @@ class bayesian_gaussianMixture():
         None
 
         """
-        if self.flip:
-            X_low = -1*X_low
+        X_low = self.flip*X_low
         labels = self.predict_(X_low)
         labels = np.array([self.mapping[i] for i in labels])
         return labels

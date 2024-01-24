@@ -40,23 +40,20 @@ class kernel_density():
     None
 
     """
-    def __init__(self, X_low, bw = (-5, -2, 20), flip = False, skip = 0):
+    def __init__(self, X_low, bw = [0.01], flip = False, skip = 0):
         
         X_low = X_low.reshape(-1,1)
         
         if flip:
-            self.flip = True
+            self.flip = -1
             X_low = -1 * X_low
         else:
-            self.flip = False
+            self.flip = 1
 
         if skip < 2: skip = 1 
 
         min_ = np.min(X_low)
         max_ = np.max(X_low)
-
-        if type(bw) == tuple:
-            bw = np.logspace(*bw)
 
         params = {"bandwidth": bw}
         grid = GridSearchCV(KernelDensity(), params).fit(X_low[::skip])
@@ -224,6 +221,5 @@ class kernel_density():
             Array containing the labels of X_low.
 
         """
-        if self.flip:
-            X_low = -1*X_low
+        X_low = self.flip * X_low
         return torch.searchsorted(self.mins, X_low).flatten()

@@ -1,5 +1,0 @@
-autoencoderValidation
----------------------
-
-.. autoclass:: AutoencoderAPI.setup.validation.autoencoderValidation.validation
-   :members:

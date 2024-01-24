@@ -1,5 +1,0 @@
-criterion
----------
-
-.. autoclass:: AutoencoderAPI.setup.criterion.build_criterion
-   :members:

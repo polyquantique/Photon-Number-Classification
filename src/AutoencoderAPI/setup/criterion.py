@@ -36,6 +36,7 @@ class build_criterion:
         def custom_without_sample(output_, input_, X, negative, param2):
             crit = self.criterion
             return crit.forward(input_, output_, negative, param2)
+        
 
         criterion_dict = {
             "CrossEntropy"       : (nn.CrossEntropyLoss() , generic),
@@ -50,7 +51,8 @@ class build_criterion:
             #"pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),
             "sklearn_kernelDensity_loss"      : (sklearn_kernelDensity_loss() , custom_with_sample),
             #"sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),
-            "trustworthinessLoss" : (trustworthinessLoss(), custom_with_sample)
+            "trustworthinessLoss" : (trustworthinessLoss(), custom_with_sample),
+            "tSNE" : (tSNE(), custom_without_sample)
         }
 
         try:

@@ -2,11 +2,16 @@ import numpy as np
 import torch
 from scipy.signal import argrelextrema
 import matplotlib.pyplot as plt 
+from matplotlib import colors
 from matplotlib.pyplot import cm
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
+#from math import sqrt
+from scipy.special import erf
+from numpy import sqrt, log
 
+#from scipy.integrate import quad
 
 
 class density_gaussianMixture():
@@ -29,59 +34,102 @@ class density_gaussianMixture():
 
     """
     def __init__(self, X_low, 
-                 bw = (-5, -2, 20), 
+                 bw = [0.01], 
+                 min_cluster_prob = 1e-6,
+                 density_kernel = 'gaussian',
                  bins_plot = 5000,
                  flip = False, 
-                 skip = 1):
+                 skip = 1,
+                 size_plot = 10):
+        
+        self.crossTalk_ = None
+        self.size_plot = size_plot
+        self.flip = -1 if flip else 1
 
-        if flip:
-            X_low = -1*X_low
-        if skip < 2:
-            skip = 1
-
-        X_low = np.array(X_low).reshape(-1,1)
-        self.min_ = np.min(X_low)
-        self.max_ = np.max(X_low)
-
-        params = {"bandwidth": bw}
-        grid = GridSearchCV(KernelDensity(), params).fit(X_low[::skip])
-        kd = grid.best_estimator_
-
-        self.space = np.linspace(self.min_, self.max_, 2*bins_plot).reshape(-1,1)
-        self.density = kd.score_samples(self.space)
-        self.maxs = self.space[argrelextrema(self.density, np.greater)[0]].reshape(-1,1)
-        self.mins = torch.tensor(self.space[argrelextrema(self.density, np.less)[0]].flatten())
-
-        bgm = GaussianMixture(n_components=len(self.maxs), tol=1e-3, max_iter=100, means_init=self.maxs)
-        fit_ = bgm.fit(X_low)
-
-        # Map labels based on their position in latent space
-        cluster_means = fit_.means_
-        cluster_covariance = fit_.covariances_
-        weights = fit_.weights_
-        labels = fit_.predict(X_low)
-
-        #Sort labels/means
-        unique_labels = range(len(cluster_means))
-        centroids, mapping = zip(*sorted(zip(cluster_means, unique_labels)))
-        sorted_labels = np.array([mapping[i] for i in labels])
+        X_low = self.flip * np.array(X_low).reshape(-1,1)
+        if skip < 2: skip = 1
+        kd = GridSearchCV(KernelDensity(), {"bandwidth": bw, 'kernel': [density_kernel]}).fit(X_low[::skip]).best_estimator_
 
         self.style_name = "seaborn-v0_8"
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.min_ = np.min(X_low)
+        self.max_ = np.max(X_low)
+        self.bins = np.linspace(self.min_, self.max_, bins_plot)
+        self.density = 10**kd.score_samples(self.bins.reshape(-1,1))
+        self.density_function = kd.score_samples
+        maxs = self.bins[argrelextrema(self.density, np.greater)[0]].reshape(-1,1)
+        #mins = self.bins[argrelextrema(self.density, np.less)[0]]
+
+        #for index_min in range(len(mins)):
+        #    if len(mins) <= index_min:
+        #        break
+        #    elif mins[index_min] < maxs[index_min]:
+        #        mins = np.delete(mins, index_min)
+        
+        #if len(maxs) > len(mins):
+        #    diff = len(maxs) - len(mins)
+        #    maxs = maxs[:-diff]
+
+        fit_ = GaussianMixture(n_components=len(maxs), 
+                               tol=1e-3, 
+                               max_iter=200, 
+                               means_init=maxs).fit(X_low)
+                
+
+        # Map labels based on their position in latent space
+        condition_small_cluster = fit_.weights_ > min_cluster_prob
+        self.cluster_means = fit_.means_[condition_small_cluster]
+        self.cluster_covariance = fit_.covariances_[condition_small_cluster]
+        self.weights = fit_.weights_[condition_small_cluster]
+        #self.mins = torch.tensor(mins[condition_small_cluster].flatten())[:-1].to(self.device)
+
+        self.cluster_means, self.cluster_covariance, self.weights  = zip(*sorted(zip(self.cluster_means, self.cluster_covariance, self.weights)))
+        self.cluster_means, self.cluster_covariance, self.weights = np.asarray(self.cluster_means), np.asarray(self.cluster_covariance), np.asarray(self.weights)
+
+        self.weights = self.weights / np.sum(self.weights)
+        l_weights = len(self.weights)
+
+        if l_weights > 1:
+            sig = self.cluster_covariance#.astype('longdouble')
+            u = self.cluster_means#.astype('longdouble')
+            scaling = self.weights#.astype('longdouble')
+            num_distributions = l_weights
+            mins = np.zeros(num_distributions-1)
+
+            for i in range(num_distributions-1):
+
+                        u1 = u[i]
+                        coeff1 = scaling[i]
+                        sig1 = sqrt(sig[i])
+                        u2 = u[i+1]
+                        coeff2 = scaling[i+1]
+                        sig2 = sqrt(sig[i+1])
+
+                        mins[i] = (u2*sig1**2 - sig2*(u1*sig2 + sig1*sqrt((u1-u2)**2 + 2*(sig1**2-sig2**2)*log((sig1* coeff2) / (sig2* coeff1)))))/(sig1**2 - sig2**2)
+
+            self.mins = torch.tensor(mins).to(self.device)
+
+        else:
+            self.mins = torch.tensor([self.max_]).to(self.device)
+
+        #Sort labels/means
+        #unique_labels = range(len(self.cluster_means))
+        #centroids, mapping = zip(*sorted(zip(self.cluster_means, unique_labels)))
+        #self.sorted_labels = np.array([self.mapping[i] for i in self.labels])
+
         self.clusters_low = []
         self.condition = []
-        for label in mapping:
-            condition = labels == label
-            self.clusters_low.append(X_low.flatten()[condition])
-            self.condition.append(condition)
+        self.labels = torch.searchsorted(self.mins, torch.tensor(X_low).to(self.device)).cpu().numpy().flatten()
+        
 
-        self.bins = np.linspace(min(X_low), max(X_low), bins_plot).reshape(-1)
-        self.cluster_means = cluster_means
-        self.cluster_covariance = cluster_covariance
-        self.weights = weights
-        self.labels = sorted_labels
-        self.predict_ = fit_.predict
-        self.flip = flip
-        self.mapping = mapping
+        for label in range(l_weights):
+            condition = self.labels == label
+        
+            cluster_low = X_low[condition]
+ 
+            self.clusters_low.append(cluster_low)
+            self.condition.append(condition)
+  
 
 
     def predict(self, X_low):
@@ -98,12 +146,167 @@ class density_gaussianMixture():
         None
 
         """
-        if self.flip:
-            X_low = -1*X_low
+        X_low = self.flip * X_low
         return torch.searchsorted(self.mins, X_low)
+    
      
+    def plot_cross_talk(self):
+
+        #https://www.wolframalpha.com/input?i2d=true&i=-Divide%5B1%2C2Power%5BSubscript%5B%CF%83%2C1%5D%2C2%5D%5D%5C%2840%29Power%5Bx%2C2%5D-2Subscript%5B%CE%BC%2C1%5Dx%2BPower%5BSubscript%5B%CE%BC%2C1%5D%2C2%5D%5C%2841%29%2Bln%5C%2840%29%CE%B1%5C%2841%29%3D-Divide%5B1%2C2Power%5BSubscript%5B%CF%83%2C2%5D%2C2%5D%5D%5C%2840%29Power%5Bx%2C2%5D-2Subscript%5B%CE%BC%2C2%5Dx%2BPower%5BSubscript%5B%CE%BC%2C2%5D%2C2%5D%5C%2841%29
+        
+        sig = self.cluster_covariance#.astype('longdouble')
+        u = self.cluster_means#.astype('longdouble')
+        scaling = self.weights#.astype('longdouble')
+
+        num_distributions = len(u)
+        crossTalk = np.zeros((num_distributions, num_distributions))#.astype('longdouble')
+
+
+        for i in range(num_distributions):
+            for j in range(num_distributions):
+                if i == j:
+                    crossTalk[j][i] = 1
+                elif i < j:
+                    u1 = u[i]
+                    coeff1 = scaling[i]
+                    sig1 = sqrt(sig[i])
+                    u2 = u[j]
+                    coeff2 = scaling[j]
+                    sig2 = sqrt(sig[j])
+
+                    inter = (u2*sig1**2 - sig2*(u1*sig2 + sig1*np.sqrt((u1-u2)**2 + 2*(sig1**2-sig2**2)*np.log((sig1* coeff2) / (sig2* coeff1)))))/(sig1**2 - sig2**2)
+                    cross = coeff1*(1 - 1/2*(1 + erf((inter-u1)/(sqrt(2)*sig1)))) + coeff2/2*(1 + erf((inter-u2)/(sqrt(2)*sig2)))
+
+                    crossTalk[j][i] = cross/coeff2
+                else:
+                    u1 = u[j]
+                    coeff1 = scaling[j]
+                    sig1 = sqrt(sig[j])
+                    u2 = u[i]
+                    coeff2 = scaling[i]
+                    sig2 = sqrt(sig[i])
+
+                    inter = (u2*sig1**2 - sig2*(u1*sig2 + sig1*np.sqrt((u1-u2)**2 + 2*(sig1**2-sig2**2)*np.log((sig1* coeff2) / (sig2* coeff1)))))/(sig1**2 - sig2**2)
+                    cross = coeff1*(1 - 1/2*(1 + erf((inter-u1)/(sqrt(2)*sig1)))) + coeff2/2*(1 + erf((inter-u2)/(sqrt(2)*sig2)))
+
+                    crossTalk[j][i] = cross/coeff2
+        """
+        num_distributions = len(self.cluster_means)
+        
+        crossTalk = np.zeros((num_distributions, num_distributions))
+
+        #plt.figure()
+        for i in range(num_distributions):
+            for j in range(num_distributions):
+                #if i == j:
+                #    crossTalk[j][i] = self.weights[i]/2
+                #else:
+                    
+                w = np.linspace(self.cluster_means[i],self.cluster_means[j],100_000)
+
+                distr1 = self.gaussian_function(w, self.cluster_means[i], self.cluster_covariance[i], self.weights[i])
+                distr2 = self.gaussian_function(w, self.cluster_means[j], self.cluster_covariance[j], self.weights[j])
+                inter = w[np.argmin(np.abs(distr2-distr1))]
+
+                #plt.plot(w, self.gaussian_function(w, self.cluster_means[i], self.cluster_covariance[i], self.weights[i]).reshape(-1,1), label='1')
+                #plt.plot(w, self.gaussian_function(w, self.cluster_means[j], self.cluster_covariance[j], self.weights[j]).reshape(-1,1), label='2')
+
+                if i > j:
+                    x1, x2 = -1, inter
+                    x3, x4 = inter, 1
+                else:
+                    x1, x2 = inter, 1
+                    x3, x4 = -1, inter
+
+
+                integral1 = quad(self.gaussian_function, x1, x2, args=(self.cluster_means[i], self.cluster_covariance[i], self.weights[i]))
+                integral2 = quad(self.gaussian_function, x3, x4, args=(self.cluster_means[j], self.cluster_covariance[j], self.weights[j]))
+                integral3 = quad(self.gaussian_function, -1, 1, args=(self.cluster_means[i], self.cluster_covariance[i], self.weights[i]))
+
+                crossTalk[j][i] = (integral1[0] + integral2[0]) / integral3[0]
+        #plt.show()
+        """
+        """
+        num_distributions = len(self.cluster_means)
+        
+        crossTalk = np.zeros((num_distributions, num_distributions))
+
+        #plt.figure()
+        for i in range(num_distributions):
+            for j in range(num_distributions):
+
+
+                self.maxs
+                self.mins
+
+                w = np.linspace(-1,1,10_000).reshape(-1,1)
+
+                distr1 = 10**self.density_function(w)
+                distr2 = 10**self.density_function(w)
+                inter = w[np.argmin(np.abs(distr2-distr1))]
+
+                #plt.plot(w, self.gaussian_function(w, self.cluster_means[i], self.cluster_covariance[i], self.weights[i]).reshape(-1,1), label='1')
+                #plt.plot(w, self.gaussian_function(w, self.cluster_means[j], self.cluster_covariance[j], self.weights[j]).reshape(-1,1), label='2')
+
+                if i > j:
+                    x1, x2 = -1, inter
+                    x3, x4 = inter, 1
+                else:
+                    x1, x2 = inter, 1
+                    x3, x4 = -1, inter
+
+
+                integral1 = quad(self.gaussian_function, x1, x2, args=(self.cluster_means[i], self.cluster_covariance[i], self.weights[i]))
+                integral2 = quad(self.gaussian_function, x3, x4, args=(self.cluster_means[j], self.cluster_covariance[j], self.weights[j]))
+                integral3 = quad(self.gaussian_function, -1, 1, args=(self.cluster_means[i], self.cluster_covariance[i], self.weights[i]))
+
+                crossTalk[j][i] = (integral1[0] + integral2[0]) / integral3[0]
+
+                
+        
+        """
+        #plt.legend()
+        #plt.show()
+        self.crossTalk_ = crossTalk
+        
+
+
+        plt.figure()
+        im = plt.imshow(self.crossTalk_, cmap="GnBu_r")#, norm=colors.LogNorm())
+        plt.colorbar(im)
+        plt.show()
     
     
+    def plot_density(self):
+        """
+        Plot the kernel density estimation over the latent space.
+        This can be useful to evaluate if the bandwidth is appropriate 
+
+        Bandwidth selection :
+        
+        - small   -> rough mapping
+        - big     -> smooth mapping 
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        """
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4), dpi=100)
+            plt.plot(self.bins, self.density)
+            plt.xlabel("Latent Space")
+            plt.ylabel("Density")
+            plt.show()
+
+    
+    def gaussian_function(self, x, mean, variance, weights):
+            return weights * (2*np.pi*variance)**(-1/2) * np.exp(-(x - mean)**2/(2*variance))
+        
 
     def plot_cluster(self):
         """
@@ -119,8 +322,6 @@ class density_gaussianMixture():
         None
 
         """
-        def gaussian_function(x, mean, variance):
-            return (2*np.pi*variance)**(-1/2) * np.exp(-(x - mean)**2/(2*variance))
         
         x = np.linspace(self.min_, self.max_, 1000).reshape(-1,1)
         n =len(self.clusters_low)
@@ -128,12 +329,15 @@ class density_gaussianMixture():
 
         #with plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 'ytick.color':'white', 'figure.facecolor':'white'}):
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(10,4)) #, dpi=100
+            plt.figure(figsize=(self.size_plot,4))#, dpi=200) #, dpi=100
             for index_cluster, cluster in enumerate(self.clusters_low):
                 c = next(color)
                 plt.hist(cluster.flatten() , self.bins, label=f"{index_cluster}", fill=True, histtype='step',color=c)#"#8dd3c7")
             for index, mean_value in enumerate(self.cluster_means):
-                plt.plot(x, gaussian_function(x, mean_value, self.cluster_covariance[index]), color="k")
+                
+                plt.plot(x, self.gaussian_function(x, mean_value, self.cluster_covariance[index], self.weights[index]), color="k")
+            #plt.vlines(self.mins.cpu(), 0,10)
+            #plt.yscale('log')
             plt.xlabel("Latent Space")
             plt.ylabel("Counts")
 
@@ -158,17 +362,14 @@ class density_gaussianMixture():
 
         """
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(10,4)) #, dpi=100
+            plt.figure(figsize=(self.size_plot,4)) #, dpi=100
             n =len(self.condition)
             color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
             
             for condition in self.condition:
                 cluster = X[condition]
                 c = next(color)
-
-                if len(cluster) > 1000:
-                    cluster = cluster[:1000]
-
+                if len(cluster) > 1000: cluster = cluster[:1000]
                 for i, _ in enumerate(cluster):
                     plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
 
@@ -194,20 +395,26 @@ class density_gaussianMixture():
 
         """
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(10,4)) #, dpi=100
+            plt.figure(figsize=(self.size_plot,4)) #, dpi=100
             n =len(self.condition)
             color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
             
             for condition in self.condition:
                 cluster = X[condition]
                 c = next(color)
-
-                if len(cluster) > 1000:
-                    cluster = cluster[:1000]
-
+                if len(cluster) > 1000: cluster = cluster[:1000]
                 plt.plot(np.mean(cluster, axis=0), c=c)
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
             plt.show()
             #plt.savefig('average_traces.svg',format="svg", transparent=True)
+
+
+    def normalize_latent(self, X_l, number):
+
+        try: 
+            return X_l / self.mins[number].cpu().numpy()
+        except:
+            return X_l 
+        

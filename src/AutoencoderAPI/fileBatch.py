@@ -14,9 +14,8 @@ from .setup.criterion import build_criterion
 from .setup.validation.autoencoderValidation import validation
 from .utils.files import save_all
 
-
-torch.use_deterministic_algorithms(True)
-torch.manual_seed(42)
+#torch.use_deterministic_algorithms(True)
+#torch.manual_seed(42)
 
 
 
@@ -24,7 +23,7 @@ class fileBatch:
 
     def __init__(self):
         
-        pass
+        self.loop = 0
 
 
     def custom_Kfold(self, config):
@@ -54,10 +53,13 @@ class fileBatch:
         config : dict
             Updated dictionary. Define `input_dimension` of the autoencoder
         """
+        #dB = np.load('Datasets/SNSPD/Paderborn/db_shuffled.npy')
+
         folder = f"{config['files']['dataset']}"
+        #files = [file_dB for index, file_dB in enumerate(listdir(folder)) if dB[index+301] == config['dB']]
         files = listdir(folder)
 
-        fold = KFold(n_splits=10,shuffle=True,random_state=42) #config['train']['k-fold']
+        fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42) 
         train_validation_files, test_files = train_test_split(files,train_size=0.9,shuffle=True)
         splits = fold.split(train_validation_files)
 
@@ -72,7 +74,7 @@ class fileBatch:
         
         batch_max = len(train_files[0])
         if train_batch_number >= batch_max:
-            warnings.warn(f"Batch number too high, was set to {batch_max} (maximum)")
+            warnings.warn(f"Batch number too high, was instead set to {batch_max} (maximum)")
             train_batch_number = batch_max
         
         batch_max = len(validation_files[0])
@@ -106,18 +108,65 @@ class fileBatch:
                 Three-dimensional tensors containing the batch samples.
                 Tensor of shape (N,0,S), where N is the number of samples and S is the size of each sample.    
         """
-        skip = config['train']["skip_elements"]
+        
         folder = f"{config['files']['dataset']}"
         size = config['files']['input_dimension']
+        size_network = config['internal']['size_network']
 
-        TES = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
+        try:
+            if config['files']['folder_type'] == 'npy':
+                TES = -1 * np.concatenate([np.load(f"{folder}/{file_name}").reshape((-1,size)) for file_name in files])
+            else:
+                TES = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files]).astype("double")
+        except Exception as ex:
+            TES = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files]).astype("double")
 
-        if skip > 1: TES = TES[:, 1::skip]
-        else : skip = 1
+        try:
+            interval = config['train']["interval"]
+            TES = TES[:, interval[0]:interval[1]]
+        except:
+            pass
+    
+        try:
+            skip = config['train']["skip_elements"]
+            if skip > 1: 
+                TES = TES[:, 1::skip]
+            else : skip = 1
+        except:
+            skip = config['train']["skip_elements"] = 1
+
+        try:
+            TES = (TES - config['internal']['mean'])/config['internal']['std']
+        except:
+            config['internal']['mean'] = np.mean(np.copy(TES))
+            config['internal']['std'] = np.std(TES)
+            TES = (TES - config['internal']['mean'])/config['internal']['std']
+        
+        
+        #if self.loop > 2:
+        #    TES = TES[np.min(TES, axis=1) < -0.00002] #####
+        #self.loop += 1
+        
+        X_ = np.copy(TES)
+        for i in range(3,6):
+
+            #X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 0.5]
+            #X_noise2 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 1]
+            #X_noise3 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 1.5]
+            #X_noise4 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 2]
+            #X_noise5 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 2.1]
+
+            #TES = np.concatenate([TES, X_noise1, X_noise2, X_noise3, X_noise4, X_noise5])
+
+            X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
+
+            TES = np.concatenate([TES, X_noise1])
+
+        TES = TES[np.max(TES, axis=1) > 0]
 
         np.random.shuffle(TES)
-
-        return torch.from_numpy(TES).view(-1, 1, int(size / skip)).float()
+        
+        return torch.from_numpy(TES).view(-1, 1, size_network).float()
 
         
 
@@ -220,27 +269,56 @@ class fileBatch:
                     encode = network(input_, encoding=True)
                     decode = network(encode, decoding =True)
 
-                    save_encode = torch.clone(encode).numpy()
-                    results['encode'].append(save_encode[0])
+                    results['encode'].append(encode.cpu().clone().numpy()[0])
 
                     if index < 2:
-                        results['input'].append(input_.clone().numpy()[0])
-                        results['decode'].append(decode.clone().numpy()[0])
+                        results['input'].append(input_.cpu().clone().numpy()[0])
+                        results['decode'].append(decode.cpu().clone().numpy()[0])
 
                 else:
                     decode = network(input_)
                     
                 loss = criterion.forward(decode, input_, X, network, list_)
-
                 cumu_loss += loss.item()
 
         if store:
             return cumu_loss / len(X), results
-        
+
         return cumu_loss, len(X)
 
     
+    def setup(self, config):
 
+        config['internal'] = {}
+        # log path and folder creation to store results
+        try:
+            if config['sweep']:
+                log_path = f"{config['files']['path_save']}"
+            else:            
+                folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+                log_path = f"{config['files']['path_save']}/run-{folder_name}"
+        except:
+            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}/run-{folder_name}"
+            
+
+        try:
+            interval = config['train']["interval"]
+            config['internal']['size_network'] = interval[1] - interval[0]
+        except:
+            config['internal']['size_network'] = config['files']['input_dimension']
+
+        try:
+            skip = config['train']['skip_elements']
+            if skip < 1: skip = 1
+            config['internal']['size_network'] = int(config['internal']['size_network']/skip)
+        except:
+            pass
+            
+        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+        return log_path, config
 
 
 
@@ -261,15 +339,8 @@ class fileBatch:
         -------
         - None
         """
-        # log path and folder creation to store results
-        if 'sweep' not in config.items():
-            config['internal'] = {}
-            folder_name = datetime.now().strftime(r"%Y-%m-%d-%H-%M")
-            log_path = f"{config['files']['path_save']}/run-{folder_name}"
-        else:
-            log_path = f"{config['files']['path_save']}"
-            
-        config['internal']['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
+        log_path, config = self.setup(config)
 
         train_files, validation_files, test_files, config = self.custom_Kfold(config)
         

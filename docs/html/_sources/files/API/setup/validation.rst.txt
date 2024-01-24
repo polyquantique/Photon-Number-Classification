@@ -1,9 +1,0 @@
-validation
-----------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: validation:
-
-   validation/autoencoderValidation
-   validation/tripletValidation

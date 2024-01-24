@@ -1,5 +1,0 @@
-correlation
------------
-
-.. autoclass:: AutoencoderAPI.utils.correlation.second_order
-   :members:

@@ -1,5 +1,0 @@
-triplet
--------
-
-.. autoclass:: AutoencoderAPI.setup.train.triplet.train
-   :members:

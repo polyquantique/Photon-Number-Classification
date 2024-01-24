@@ -2,7 +2,7 @@ from os import makedirs, listdir
 import numpy as np
 from datetime import datetime
 from tqdm.notebook import tqdm
-
+from warnings import warn
 import torch
 
 from .setup.networks.autoencoder import build_autoencoder
@@ -14,8 +14,8 @@ from .setup.validation.tripletValidation import validation
 from .utils.files import save_all
 from .utils.clustering.kernelDensity import kernel_density
 
-torch.use_deterministic_algorithms(True)
-torch.manual_seed(42)
+#torch.use_deterministic_algorithms(True)
+#torch.manual_seed(42)
 
 class recurrentTriplet():
 
@@ -43,32 +43,59 @@ class recurrentTriplet():
 
         try:
             if config['sweep']:
-                folder_name = ""
+                log_path = f"{config['files']['path_save']}"
         except:
             folder_name = "/run-" + datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
+        
 
-        log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
-
+        config['internal'] = {}
         # Define device and run on Cuda if is available
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Define dataset
-        skip = config['train']["skip_elements"]
         folder = f"{config['files']['dataset']}"
         size = config['files']['input_dimension']
         files = listdir(folder)
 
-        X = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
-        if skip > 1: 
-            X = X[:, ::skip]
-            X= X[:,:int(size / skip)]
-        else : skip = 1
-
         
         
-        data = torch.from_numpy(X).view(-1, 1, int(size / skip)).float().to(self.device)
+        try:
+            interval = config['train']["interval"]
+            config['internal']['size_network'] = interval[1] - interval[0]
+            interval1 = interval[0]
+            interval2 = interval[1]
+        except:
+            config['internal']['size_network'] = config['files']['input_dimension']
+            interval1 = 0
+            interval2 = config['files']['input_dimension']
 
-        return data, log_path
+        try:
+            skip = config['train']['skip_elements']
+            if skip < 1: skip = 1
+            config['internal']['size_network'] = int(config['internal']['size_network']/skip)
+        except:
+            skip = 1
+
+        try:
+            if config['files']['folder_type'] == 'npy':
+                X = np.concatenate([np.load(f"{folder}/{file_name}").reshape((-1,size))[:,interval1:interval2][::skip] for file_name in files])
+            else:
+                X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:,interval1:interval2][::skip] for file_name in files]).astype("double")
+        except Exception as ex:
+            print(ex)
+            X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:,interval1:interval2][::skip] for file_name in files]).astype("double")
+
+        try:
+            X = (X - config['internal']['mean'])/config['internal']['std']
+        except:
+            config['internal']['mean'] = np.mean(np.copy(X))
+            config['internal']['std'] = np.std(X)
+            X = (X - config['internal']['mean'])/config['internal']['std']
+            
+        data = torch.from_numpy(X).view(-1, 1, config['internal']['size_network']).float().to(self.device)
+
+        return data, log_path, config
 
 
 
@@ -135,9 +162,16 @@ class recurrentTriplet():
 
         with torch.no_grad():
             X_low_dim = network(X, encoding=True)
-            X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+            X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 1)
 
+            min_ = np.min(X_low_dim)
+            max_ = np.max(X_low_dim)
+
+            X_low_dim = X_low_dim - min_ /(max_ - min_)
             cl = kernel_density(X_low_dim, bw)
+
+            if len(np.unique(cl.labels)) == 1:
+                warn('One class detected : bw_cst might be too large')
 
             return cl.labels
 
@@ -169,43 +203,36 @@ class recurrentTriplet():
                 'test_loss'         : []
                 }
 
-        data, log_path = self.setup(config)
-        learning_rate = config['train']['learning_rate']
+        data, log_path, config = self.setup(config)
         train_index, validation_index, test_index = self.split_dataset(data)
         network = build_autoencoder(config).float().to(self.device)
         
         
         config['train']['criterion'] = 'MSELoss'
-        config['train']['learning_rate'] = 1e-4
+        config['train']['learning_rate'] = config['train']['learning_rate_MSE']
         criterion = build_criterion(config)
         optimizer = build_optimizer(network, config)
 
-        for epoch in tqdm(range(4) , desc="Epoch MSE"):
+        for epoch in tqdm(range(config['train']['epochs_MSE']) , desc="Epoch MSE"):
             train_loss = train_MSE(network, data[train_index], optimizer, criterion)
         
-        
+
         config['train']['criterion'] = 'TripletMSE'
-        config['train']['learning_rate'] = learning_rate
-        bw_cst = config['network']['bw_cst']
-        
+        config['train']['learning_rate'] = config['train']['learning_rate_triplet']
         criterion = build_criterion(config)
         optimizer = build_optimizer(network, config)
 
-        n_cluster = range(17,25)
-        train_dataset = data[train_index]
-        validation_dataset = data[validation_index]
-        for epoch in tqdm(range(config['train']['epochs']) , desc="Epoch Triplet"):
-            #, train_dataset
-            train_labels = self.update_cluster(network, train_dataset, bw_cst)
-            train_loss = train_Triplet(config, network, train_dataset, optimizer, criterion, train_labels)
+        for epoch in tqdm(range(config['train']['epochs_triplet']) , desc="Epoch Triplet"):
+            train_labels = self.update_cluster(network, data[train_index], config['network']['bw_cst'])
+            train_loss = train_Triplet(config, network, data[train_index], optimizer, criterion, train_labels)
 
-            validation_labels = self.update_cluster(network, validation_dataset, bw_cst)
-            validation_loss = validation(config['train']['alpha'], network, validation_dataset, criterion, validation_labels)
+            validation_labels = self.update_cluster(network, data[validation_index], config['network']['bw_cst'])
+            validation_loss = validation(config['train']['alpha'], network, data[validation_index], criterion, validation_labels)
 
             loss['train_loss'].append(train_loss) # Triplet
             loss['validation_loss'].append(validation_loss) # Triplet
 
-        test_labels = self.update_cluster(network, data[test_index], bw_cst)
+        test_labels = self.update_cluster(network, data[test_index], config['network']['bw_cst'])
         test_loss, results = validation(config['train']['alpha'], network, data[test_index], criterion, test_labels, store=True)
         loss['test_loss'].append(test_loss)
 

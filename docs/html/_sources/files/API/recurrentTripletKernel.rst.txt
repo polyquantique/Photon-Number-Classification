@@ -1,9 +1,0 @@
-
-recurrentTripletKernel
-----------------------
-
-.. autoclass:: AutoencoderAPI.recurrentTripletKernel.recurrentTriplet
-   :members:
-
-
-

@@ -46,18 +46,15 @@ class build_autoencoder(nn.Module):
             "Threshold"  : nn.Threshold,
         }
 
-        skip = config['train']["skip_elements"]
-        size = config['files']['input_dimension']
         layer_list = config['network']['layer_list'].copy()
-        if skip <= 1 : skip = 1
-        input_ = int(size / skip)
+        input_ = config['internal']['size_network']
         layer_list = [input_] + layer_list + [input_]
         activation_list = config['network']['activation_list']
         network_type = config['network']['network_type']
         
         self.encoder = nn.Sequential()
         self.decoder = nn.Sequential()
-        
+
         switch = True
         for index, activation_type in enumerate(activation_list):
 
@@ -67,17 +64,22 @@ class build_autoencoder(nn.Module):
             if switch:
                 if network_type == 'CNN':
                     self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+                elif network_type == 'dropout':
+                    self.encoder.append(nn.Dropout(0.1))
                 self.encoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
                 self.encoder.append(activation_dict[activation_type]())
             else:
                 self.decoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
                 if network_type == 'CNN':
                     self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
+                elif network_type == 'dropout':
+                    self.encoder.append(nn.Dropout(0.1))
                 self.decoder.append(activation_dict[activation_type]())
         
         self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
-        print(self.encoder)
-        print(self.decoder)
+        #self.decoder.append(nn.Dropout(0.2))
+        #print(self.encoder)
+        #print(self.decoder)
 
 
     def forward(self, X, encoding=False, decoding=False, both=False) -> any:

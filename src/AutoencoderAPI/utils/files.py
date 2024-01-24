@@ -77,3 +77,11 @@ def save_all(log_path, network, results, loss, config):
     save_object(results , f"{log_path}/results")
     save_object(loss , f"{log_path}/loss")
     save_object(config, f"{log_path}/log")
+
+
+def load_mean_std(file_name):
+
+    path = f"AutoencoderLog/{file_name}"
+    config = open_object(f"{path}/log.bin")
+
+    return config['internal']['mean'], config['internal']['std']

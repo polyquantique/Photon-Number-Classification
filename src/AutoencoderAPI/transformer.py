@@ -15,8 +15,8 @@ from .setup.validation.tripletValidation import validation
 from .setup.validation.autoencoderValidation import validation
 from .utils.files import save_all
 
-torch.use_deterministic_algorithms(True)
-torch.manual_seed(42)
+#torch.use_deterministic_algorithms(True)
+#torch.manual_seed(42)
 
 class transformer():
 

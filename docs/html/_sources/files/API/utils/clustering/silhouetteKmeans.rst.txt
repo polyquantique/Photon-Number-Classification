@@ -1,5 +1,0 @@
-silhouetteKmeans
-----------------
-
-.. autoclass:: AutoencoderAPI.utils.clustering.silhouetteKmeans.silhouette_kmean
-   :members:

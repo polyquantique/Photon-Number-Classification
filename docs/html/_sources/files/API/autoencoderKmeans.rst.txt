@@ -1,5 +1,0 @@
-autoencoderKmeans
------------------
-
-.. autoclass:: AutoencoderAPI.autoencoderKmeans.autoencoder_kmeans
-   :members:

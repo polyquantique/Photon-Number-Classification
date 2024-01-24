@@ -6,12 +6,12 @@ from sklearn.metrics import mean_squared_error
 from sklearn.manifold import trustworthiness
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
 
-from AutoencoderAPI.utils.clustering.kernelDensity import kernel_density
+from AutoencoderAPI.utils.clustering.densityGaussianMixture import density_gaussianMixture
 
 
 class compare():
 
-    def __init__(self, bw = (-5, -2, 20)):
+    def __init__(self, flip, density_kernel, bw = (-5, -2, 20)):
         self.style_name = "seaborn-v0_8"
         self.metric_list = [    
                         ('Silhouette'                   , self.silhouette_kernel         , 1), 
@@ -23,7 +23,9 @@ class compare():
                         #('Number of\ncluster'           , self.cluster_number            , 1)
                       ]
         self.bw = bw
-        self.kd = None
+        self.flip = flip
+        self.dgm = None
+        self.density_kernel = density_kernel
 
     def MSE(self, X, X_reconst):
         """
@@ -179,7 +181,7 @@ class compare():
             Number of clusters in the feature space.
 
         """
-        return len(self.kd.clusters_low)
+        return len(self.dgm.clusters_low)
 
 
     def score_kernel_density(self, X, X_low_dim, score, labels = None):
@@ -206,12 +208,12 @@ class compare():
 
         """
         if labels.any() == None:
-            labels = self.kd.labels
+            labels = self.dgm.labels
 
         if len(np.unique(labels)) < 2:
             return 0
-  
-        return score(X_low_dim, labels)
+        else:
+            return score(X_low_dim, labels)
 
 
     def quality_metrics_table(self, X_init, X_reconst, X_low_dim, Title):
@@ -249,7 +251,7 @@ class compare():
         scores = np.zeros((len(X_init) , len(metric_list)))
 
         for index_samples, X in tqdm(enumerate(X_init), desc='Method', total=len(Title)):
-            self.kd = kernel_density(X_low_dim[index_samples], self.bw)
+            self.dgm = density_gaussianMixture(X_low_dim[index_samples], bw=self.bw[index_samples], density_kernel=self.density_kernel[index_samples], flip=self.flip[index_samples])
             for index_metric, (name, metric, metric_type) in tqdm(enumerate(metric_list), desc=f'{Title[index_samples]}' , total=len(metric_list)):
             
                 if metric_type:
@@ -278,21 +280,23 @@ class compare():
 
 
     
-    def quality_metric_plot(self, X_init, X_reconst, X_low_dim, Title, max_number_cluster):
+    def quality_metric_plot(self, X_init, X_low_dim, Title, max_number_cluster):
 
         metric_list = self.metric_list
         scores = np.zeros((len(metric_list), len(X_init), max_number_cluster))
 
         for index_samples, X_init_it in tqdm(enumerate(X_init), total=len(X_init)):
 
-            self.kd = kernel_density(X_low_dim[index_samples], [self.bw[index_samples]])
-            labels = self.kd.labels
-            length = len(self.kd.clusters_low)
+            self.dgm = density_gaussianMixture(X_low_dim[index_samples], bw=[self.bw[index_samples]], density_kernel=self.density_kernel[index_samples] , flip=self.flip[index_samples])
+            self.dgm.plot_cluster()
+            labels = self.dgm.labels
+            length = len(self.dgm.clusters_low)
 
-            for label in range(length):
+            for label in range(max_number_cluster):
 
-                if label == 0:
+                if label == 0 or label > length:
                     continue
+
                 condition = np.in1d(labels, range(label))
                 X_init_temp = X_init_it[condition]
                 X_low_dim_temp = X_low_dim[index_samples][condition]
@@ -327,3 +331,5 @@ class compare():
 
                 plt.legend()
                 plt.show()
+
+        return scores

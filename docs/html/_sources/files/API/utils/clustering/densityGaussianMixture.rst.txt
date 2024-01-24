@@ -1,5 +1,0 @@
-densityGaussianMixture
-----------------------
-
-.. autoclass:: AutoencoderAPI.utils.clustering.densityGaussianMixture.density_gaussianMixture
-   :members:

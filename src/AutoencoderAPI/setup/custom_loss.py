@@ -112,3 +112,20 @@ class trustworthinessLoss:
         MSE = mse(output_, input_)
         
         return 1/t + MSE
+
+
+
+class tSNE:
+
+    def __init__(self):
+        pass
+
+    def forward(self, input_, output_, X_low_auto, X_low_tSNE):
+
+        mse = nn.MSELoss()
+        MSE_tSNE = mse(X_low_auto, X_low_tSNE)
+
+        mse = nn.MSELoss()
+        MSE_auto = mse(output_, input_)
+        
+        return  MSE_tSNE #+ MSE_auto
