@@ -60,24 +60,24 @@ def decibel_table_npy(path_data, path_dB, size, mean, std):
 
     for file_number in range(number_file):
         
-        data_temp = np.load(f"{path_data}/TracesNr{file_number}.npy").reshape(-1,size)
+        data_temp = -1*np.load(f"{path_data}/TracesNr{file_number}.npy").reshape(-1,size)
         
         data_temp = data_temp[:, 3250:4500]
         data_temp = (data_temp - mean)/std
-        ##zeros = data_temp[np.min(data_temp, axis=1) >= 1.6]
-        #data_temp = data_temp[np.min(data_temp, axis=1) < -0.55]
-        #data_temp = data_temp[np.max(data_temp, axis=1) > 0]
+        zeros = data_temp[np.max(data_temp, axis=1) <= 0]
+        data_temp = data_temp[np.min(data_temp, axis=1) < -0.55]
+        data_temp = data_temp[np.max(data_temp, axis=1) > 0]
 
 
-        #decibel_zeros.append(dB[file_number] * np.ones(len(zeros)))
+        decibel_zeros.append(dB[file_number] * np.ones(len(zeros)))
         decibel.append(dB[file_number] * np.ones(len(data_temp)))
         data.append(data_temp)
 
-    #decibel_zeros = np.concatenate(decibel_zeros)
+    decibel_zeros = np.concatenate(decibel_zeros)
     decibel = np.concatenate(decibel)
     data = np.concatenate(data)
         
-    return -1*data, decibel#, decibel_zeros
+    return data, decibel, decibel_zeros
 
 
 

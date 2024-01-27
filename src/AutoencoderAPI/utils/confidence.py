@@ -14,7 +14,8 @@ class confidence:
                 density_kernel='gaussian',
                 flip = False, 
                 skip = 0,
-                size_plot = 10):
+                size_plot = 10,
+                scaling = 1):
 
         # Global clustering for photon number assignment
         kd = density_gaussianMixture(X_low, 
@@ -28,12 +29,15 @@ class confidence:
 
         # Verification of clusters
         kd.plot_density()
-        kd.plot_cluster()
+        kd.plot_cluster(scaling)
 
         self.style_name = "seaborn-v0_8"
         self.possible_photon_number = np.unique(kd.labels)
         self.predict = kd.predict
         self.labels = kd.labels
+
+        self.n_arr = []
+        self.confidence = []
 
     
     def fit(self, X_low,
@@ -43,7 +47,8 @@ class confidence:
             density_kernel='gaussian',
             flip = False, 
             skip = 0,
-            size_plot = 10):
+            size_plot = 10,
+            scaling = 1):
 
         # Global clustering for photon number assignment
         kd = density_gaussianMixture(X_low, 
@@ -57,7 +62,7 @@ class confidence:
 
         # Verification of clusters
         kd.plot_density()
-        kd.plot_cluster()
+        kd.plot_cluster(scaling)
         kd.plot_cross_talk()
 
         cross_talk = kd.crossTalk_
@@ -68,7 +73,7 @@ class confidence:
         range_ = len(cross_talk)
         confidence = []
 
-        n_arr = np.linspace(1,range_,range_)#.astype('longdouble')
+        n_arr = np.linspace(0,range_,range_)#.astype('longdouble')
         p_n = np.exp(-n_) * (n_**n_arr) / factorial(n_arr)
 
         for n in range(range_):
@@ -81,9 +86,22 @@ class confidence:
 
             confidence.append(confidence_temp)
 
+        self.n_arr.append(n_arr)
+        self.confidence.append(confidence)
+
         with plt.style.context(self.style_name):
             plt.figure(figsize=(10,4))
             plt.plot(n_arr,confidence)
+            plt.xlabel("Photon number")
+            plt.ylabel("Confidence")
+            plt.show()
+
+    def plot_all(self):
+
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(10,4))
+            for n_arr, confidence in zip(self.n_arr, self.confidence):
+                plt.plot(n_arr,confidence)
             plt.xlabel("Photon number")
             plt.ylabel("Confidence")
             plt.show()

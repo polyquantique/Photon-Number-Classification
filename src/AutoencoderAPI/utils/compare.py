@@ -11,7 +11,7 @@ from AutoencoderAPI.utils.clustering.densityGaussianMixture import density_gauss
 
 class compare():
 
-    def __init__(self, flip, density_kernel, bw = (-5, -2, 20)):
+    def __init__(self, flip, min_cluster_prob, density_kernel, bw = (-5, -2, 20)):
         self.style_name = "seaborn-v0_8"
         self.metric_list = [    
                         ('Silhouette'                   , self.silhouette_kernel         , 1), 
@@ -23,6 +23,7 @@ class compare():
                         #('Number of\ncluster'           , self.cluster_number            , 1)
                       ]
         self.bw = bw
+        self.min_cluster_prob = min_cluster_prob
         self.flip = flip
         self.dgm = None
         self.density_kernel = density_kernel
@@ -251,7 +252,11 @@ class compare():
         scores = np.zeros((len(X_init) , len(metric_list)))
 
         for index_samples, X in tqdm(enumerate(X_init), desc='Method', total=len(Title)):
-            self.dgm = density_gaussianMixture(X_low_dim[index_samples], bw=self.bw[index_samples], density_kernel=self.density_kernel[index_samples], flip=self.flip[index_samples])
+            self.dgm = density_gaussianMixture(X_low_dim[index_samples], 
+                                               bw=self.bw[index_samples], 
+                                               min_cluster_prob = self.min_cluster_prob[index_samples],
+                                               density_kernel=self.density_kernel[index_samples], 
+                                               flip=self.flip[index_samples])
             for index_metric, (name, metric, metric_type) in tqdm(enumerate(metric_list), desc=f'{Title[index_samples]}' , total=len(metric_list)):
             
                 if metric_type:
@@ -287,7 +292,11 @@ class compare():
 
         for index_samples, X_init_it in tqdm(enumerate(X_init), total=len(X_init)):
 
-            self.dgm = density_gaussianMixture(X_low_dim[index_samples], bw=[self.bw[index_samples]], density_kernel=self.density_kernel[index_samples] , flip=self.flip[index_samples])
+            self.dgm = density_gaussianMixture(X_low_dim[index_samples], 
+                                               bw=[self.bw[index_samples]], 
+                                               min_cluster_prob = self.min_cluster_prob[index_samples],
+                                               density_kernel=self.density_kernel[index_samples] , 
+                                               flip=self.flip[index_samples])
             self.dgm.plot_cluster()
             labels = self.dgm.labels
             length = len(self.dgm.clusters_low)
