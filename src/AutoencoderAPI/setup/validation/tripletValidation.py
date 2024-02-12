@@ -1,7 +1,14 @@
 import torch
 
 
-def validation(alpha, network, X, criterion, cluster_label, store=False):
+def validation(alpha, 
+               network, 
+               X, 
+               criterion, 
+               cluster_means,
+               self,
+               cluster_label, 
+               store=False):
     """
     Validation or testing.
     This action consists of a forward pass of the network using the desired samples.
@@ -36,6 +43,7 @@ def validation(alpha, network, X, criterion, cluster_label, store=False):
         Average loss : float
             Average loss of the training process (loss of one epoch).
     """
+    negative = torch.tensor([cluster_means[index] for index in torch.roll(cluster_label,1)]).to(self.device)
     cumu_loss = 0
     _ = None
 
@@ -62,12 +70,12 @@ def validation(alpha, network, X, criterion, cluster_label, store=False):
             else:
                 decode = network(data)
             
-            current_label = cluster_label[index]
-            negative_index = torch.where(cluster_label != current_label)[0]
-            rand_index = torch.randint(negative_index.size(0), (1,))
-            negative = X[negative_index[rand_index]]
+            #current_label = cluster_label[index]
+            #negative_index = torch.where(cluster_label != current_label)[0]
+            #rand_index = torch.randint(negative_index.size(0), (1,))
+            #negative = X[negative_index[rand_index]]
 
-            loss = criterion.forward(decode, data, _, negative.view(1,-1), alpha)
+            loss = criterion.forward(decode, data, _, negative[index].view(1,-1), alpha)
             cumu_loss += loss.item()
 
     if store:

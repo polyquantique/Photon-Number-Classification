@@ -1,7 +1,7 @@
 from tqdm.notebook import tqdm
 from random import choice, choices
 from sklearn.model_selection import ParameterGrid
-#from .recurrentTriplet import recurrentTriplet
+from .recurrentTriplet import recurrentTriplet
 #from .transformer import transformer
 from .fileBatch import fileBatch
 
@@ -47,8 +47,11 @@ class sweep:
                 run_config['train'][value] = parameters[value]
             
             run_config['files']['path_save'] = f"{path_save}/{name}/run {str(sweep_index).rjust(len(str(test_number)), '0')}"
-            exp = fileBatch()
-            exp.run(run_config)
+            try:
+                exp = recurrentTriplet()#fileBatch()
+                exp.run(run_config)
+            except:
+                pass
             sweep_index += 1
 
 

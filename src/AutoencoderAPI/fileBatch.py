@@ -130,7 +130,7 @@ class fileBatch:
         try:
             skip = config['train']["skip_elements"]
             if skip > 1: 
-                TES = TES[:, 1::skip]
+                TES = TES[:, ::skip]
             else : skip = 1
         except:
             skip = config['train']["skip_elements"] = 1
@@ -159,10 +159,18 @@ class fileBatch:
             #TES = np.concatenate([TES, X_noise1, X_noise2, X_noise3, X_noise4, X_noise5])
 
             X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
+            #X_noise2 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
+
 
             TES = np.concatenate([TES, X_noise1])
 
         TES = TES[np.max(TES, axis=1) > 0]
+
+        condition = np.min(TES, axis=1) < -1.5
+        TES = TES[condition]
+
+        condition = TES[:,100] > -1.5
+        TES = TES[condition]
 
         np.random.shuffle(TES)
         

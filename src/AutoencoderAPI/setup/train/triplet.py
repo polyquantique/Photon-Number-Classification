@@ -1,7 +1,16 @@
 import torch
+from tqdm.notebook import tqdm
+import random
 
 
-def train(config, network, X, optimizer, criterion, cluster_label):
+def train(config, 
+          network, 
+          X, 
+          optimizer, 
+          criterion, 
+          cluster_label, 
+          cluster_means, 
+          self):
         """
         Training process executed for every epoch. The actions consists of setting the gradients to zero, 
         making predictions for the batch, computing the loss and its gradient and updating the weights and biases.
@@ -28,21 +37,25 @@ def train(config, network, X, optimizer, criterion, cluster_label):
         Average loss : float
                 Average loss of the training process (loss of one epoch).
         """
+        negative = torch.tensor([torch.roll(cluster_means, random.choice([-1,1]))[index] for index in cluster_label]).to(self.device)
         cumu_loss = 0
         _ = None
         network.train()
-        for index, input_ in enumerate(X):#tqdm(enumerate(X_train),total=X_train.size(0) , desc='Train Triplet'):
-                
+        #for index, input_ in tqdm(enumerate(X), total=X.size(0)):#tqdm(enumerate(X_train),total=X_train.size(0) , desc='Train Triplet'):
+        for negative_, input_ in tqdm(zip(negative, X), total=X.size(0)):
+
                 # Zero gradient
                 optimizer.zero_grad()
                 # Forward
                 output_ = network(input_)
                 # Criterion
-                current_label = cluster_label[index]
-                negative_index = torch.where(cluster_label != current_label)[0]
-                rand_index = torch.randint(negative_index.size(0), (1,))
-                negative = X[negative_index[rand_index]]
-                loss = criterion.forward(output_, input_, _, negative.view(1,-1), config['train']['alpha'])
+                #current_label = cluster_label[index]
+                
+                #negative_index = torch.where(cluster_label != current_label)[0]
+                #rand_index = torch.randint(negative_index.size(0), (1,))
+                #negative = X[negative_index[rand_index]]
+
+                loss = criterion.forward(output_, input_, _, negative_.view(1,-1), config['train']['alpha'])
                 # Backward
                 loss.backward()
                 optimizer.step()

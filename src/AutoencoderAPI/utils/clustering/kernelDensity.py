@@ -40,7 +40,10 @@ class kernel_density():
     None
 
     """
-    def __init__(self, X_low, bw = [0.01], flip = False, skip = 0):
+    def __init__(self, X_low, 
+                 bw = [0.01], 
+                 flip = False, 
+                 skip = 0):
         
         X_low = X_low.reshape(-1,1)
         
@@ -97,7 +100,7 @@ class kernel_density():
         """
         with plt.style.context(self.style_name):
             plt.figure(figsize=(10,4), dpi=100)
-            plt.plot(self.space, self.density)
+            plt.plot(self.space, np.exp(self.density))
             plt.xlabel("Latent Space")
             plt.ylabel("Density")
             plt.show()

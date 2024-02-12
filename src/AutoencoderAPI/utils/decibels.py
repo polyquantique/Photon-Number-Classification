@@ -60,7 +60,7 @@ def decibel_table_npy(path_data, path_dB, size, mean, std):
 
     for file_number in range(number_file):
         
-        data_temp = -1*np.load(f"{path_data}/TracesNr{file_number}.npy").reshape(-1,size)
+        data_temp = -1*np.load(f"{path_data}/TracesNr{file_number}.npy").reshape(-1,size)#-1*
         
         data_temp = data_temp[:, 3250:4500]
         data_temp = (data_temp - mean)/std
