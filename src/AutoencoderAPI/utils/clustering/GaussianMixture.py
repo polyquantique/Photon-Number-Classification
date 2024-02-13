@@ -35,7 +35,8 @@ class gaussian_mixture():
                  number_cluster = 1,
                  flip = False, 
                  size_plot = 10,
-                 dx = 1e-4):
+                 dx = 1e-4,
+                 label_shift = 0):
         
         self.flip = -1 if flip else 1
         
@@ -46,13 +47,15 @@ class gaussian_mixture():
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.size_plot = size_plot
         self.number_cluster = number_cluster
+        self.label_shift = label_shift
         self.min_ = np.min(X_low)
         self.max_ = np.max(X_low)
         self.s = np.arange(self.min_, self.max_, dx)
         self.len_s = len(self.s)
-        self.p_s = np.zeros(number_cluster)
+        self.p_s = None 
+        self.p_n = None
+        self.p_sn = None
         self.p_ns = np.zeros((number_cluster, self.len_s))
-        self.p_sn = np.zeros((number_cluster, self.len_s))
         
 
         fit_ = GaussianMixture(n_components=number_cluster, 
@@ -67,22 +70,21 @@ class gaussian_mixture():
                                means_init=means_init).fit(X_low)
                 
         self.cluster_means = fit_.means_
-        self.cluster_covariance = fit_.covariances_
+        self.cluster_covariances = fit_.covariances_
         self.cluster_weights = fit_.weights_
         self.predict_ = fit_.predict
         self.clusters_low = []
         self.condition = []
-        self.labels = self.predict_(X_low)
+        self.labels = self.predict_(X_low) + self.label_shift
         self.unique_labels = np.unique(self.labels)
 
-        for label in range(len(self.unique_labels)):
+        for label in self.unique_labels:
             condition = self.labels == label
         
             cluster_low = X_low[condition]
  
             self.clusters_low.append(cluster_low)
             self.condition.append(condition)
-  
 
 
     def predict(self, X_low):
@@ -100,12 +102,15 @@ class gaussian_mixture():
 
         """
         X_low = self.flip * X_low
-        return self.predict_(X_low)
-    
-     
-    def gaussian_function(self, x, mean, variance, weights):
-            return weights * (2*np.pi*variance)**(-1/2) * np.exp(-(x - mean)**2/(2*variance))
-    
+        return self.predict_(X_low) + self.label_shift
+        
+    def multi_gaussian(self, x):
+        mean = self.cluster_means.reshape(-1,1)
+        variance = self.cluster_covariances.reshape(-1,1)
+        weights = self.cluster_weights.reshape(-1,1)
+        x = x.reshape(1,-1)
+        return weights * (2*np.pi*variance)**(-0.5) * np.exp(-(x - mean)**2/(2*variance))
+        
 
     def plot_cluster(self,
                      number_bins = 5000):
@@ -129,7 +134,7 @@ class gaussian_mixture():
             plt.figure(figsize=(self.size_plot,4))
             for index_cluster, cluster in enumerate(self.clusters_low):
                 plt.hist(cluster.flatten() , bins, 
-                         label=f"{index_cluster}", 
+                         label=f"{index_cluster + self.label_shift}", 
                          fill=True, 
                          histtype='step',
                          color=next(color))
@@ -140,46 +145,66 @@ class gaussian_mixture():
         #plt.savefig('cluster.svg',format="svg", transparent=True)
             
 
-    def plot_psn(self):
-        """
-        
-        """
-        color = iter(self.color)
-
-        with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4))
-            for index, (mean, variance, weights) in enumerate(zip(self.cluster_means,
-                                                        self.cluster_covariance,
-                                                        self.cluster_weights)):
-                self.p_sn[index, :] = self.gaussian_function(self.s, mean, variance, weights).flatten()
-                plt.plot(self.s, self.p_sn[index, :],
-                         color = next(color),
-                         label = f'{index}')
-            self.p_s = np.sum(self.p_sn, axis=0)
-            plt.plot(self.s, self.p_s, 
-                     label = 'Mixture',
-                     alpha = 0.3)
-            plt.xlabel("Latent Space")
-            plt.ylabel("Counts")
-            plt.legend(ncol=3)
-            plt.show()
-
-    
-    def plot_pns(self,
+    def plot_psn(self,
                  n_average):
         """
         
         """
         color = iter(self.color)
-        p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
-        self.p_ns = self.p_sn * p_n / self.p_s
+        self.p_sn = self.multi_gaussian(self.s)
+        self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
+        self.p_s = np.sum(self.p_sn * self.p_n, axis = 0) 
+
+        with plt.style.context(self.style_name):
+            plt.figure(figsize = (self.size_plot,4))
+            for index, gaussian in enumerate(self.p_sn):
+                plt.plot(self.s, gaussian,
+                         color = next(color),
+                         label = f'{index + self.label_shift}')
+        
+            plt.plot(self.s, np.sum(self.p_sn, axis = 0) , 
+                     label = 'Mixture',
+                     alpha = 0.3)
+            plt.xlabel("Latent Space")
+            plt.ylabel(r"$p(s|n)$")
+            plt.legend(ncol=3)
+            plt.show()
+
+    
+    def plot_pns(self):
+        """
+        
+        """
+        color = iter(self.color)
+        #self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
+        self.p_ns = self.p_sn * self.p_n / self.p_s
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4))
-            for p_ns_ in self.p_ns:
-                plt.plot(self.s, p_ns_, color=next(color))
+            for index, p_ns_ in enumerate(self.p_ns):
+                plt.plot(self.s, p_ns_, 
+                         color=next(color),
+                         label = f'{index + self.label_shift}')
             plt.xlabel("Latent Space")
-            plt.ylabel("Counts")
+            plt.ylabel(r"$p(n|s)$")
+            plt.legend(ncol=3)
+            plt.show()
+
+
+    def plot_confidence(self):
+        """
+        
+        """
+        color = iter(self.color)
+
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(self.size_plot,4))
+            for index, (p_ns_, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
+                plt.plot(self.s, p_ns_ * p_sn, 
+                         color=next(color),
+                         label = f'{index + self.label_shift}')
+            plt.xlabel("Latent Space")
+            plt.ylabel(r"$p(n|s)$")
             plt.legend(ncol=3)
             plt.show()
 
