@@ -12,8 +12,8 @@ from scipy.special import erf
 from numpy import sqrt, log
 
 from scipy.stats import norm
-from scipy.integrate import  quad
-from scipy.special import factorial
+from scipy.integrate import  trapezoid
+from scipy.signal import find_peaks
 
 #from scipy.integrate import quad
 
@@ -35,8 +35,9 @@ class gaussian_mixture():
                  number_cluster = 1,
                  flip = False, 
                  size_plot = 10,
-                 dx = 1e-4,
-                 label_shift = 0):
+                 dx = 1e-5,
+                 label_shift = 0,
+                 means_init = None):
         
         self.flip = -1 if flip else 1
         
@@ -46,28 +47,52 @@ class gaussian_mixture():
         self.color = cm.GnBu_r(np.linspace(0, 1, int(1.5*number_cluster)))
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.size_plot = size_plot
-        self.number_cluster = number_cluster
         self.label_shift = label_shift
         self.min_ = np.min(X_low)
         self.max_ = np.max(X_low)
-        self.s = np.arange(self.min_, self.max_, dx)
+        self.s = np.arange(self.min_-0.1, self.max_+0.1, dx)
         self.len_s = len(self.s)
         self.p_s = None 
         self.p_n = None
         self.p_sn = None
-        self.p_ns = np.zeros((number_cluster, self.len_s))
+        self.p_ns = None
+        self.mixture = None
         
+        #if isinstance(means_init, np.ndarray):
+        #    fit_ = GaussianMixture(n_components=number_cluster, 
+        #                       tol=1e-3, 
+        #                       max_iter=200,
+        #                       means_init = means_init).fit(X_low)
+        #else:
+
+        #hist = np.histogram(X_low,5000)
+        #peaks, _ = find_peaks(hist[0], prominence=90)
+        #means_init = hist[1][peaks].reshape(-1,1)
+
+        #plt.figure()
+        #plt.scatter(hist[1][:-1], hist[0], s=1)
+        #plt.vlines(means_init, 0,100)
+        #plt.show()
+
+        #if len(means_init) > number_cluster:
+        #    means_init = means_init[:number_cluster]
+        #else:
+        #    dif = number_cluster - len(means_init)
+        #    means_init = np.concatenate([means_init, np.random.uniform(self.min_, self.max_,dif).reshape(-1,1)])
 
         fit_ = GaussianMixture(n_components=number_cluster, 
-                               tol=1e-3, 
-                               max_iter=200).fit(X_low)
+                            tol = 1e-5, 
+                            max_iter = 200,
+                            init_params='k-means++',
+                            means_init = means_init).fit(X_low)
         
         means_init = np.sort(fit_.means_.reshape(-1,1), axis=0)
 
-        fit_ = GaussianMixture(n_components=number_cluster, 
-                               tol=1e-3, 
-                               max_iter=200,
-                               means_init=means_init).fit(X_low)
+        fit_ = GaussianMixture(n_components = number_cluster, 
+                               tol = 1e-5, 
+                               max_iter = 200,
+                               init_params='k-means++',
+                               means_init = means_init).fit(X_low)
                 
         self.cluster_means = fit_.means_
         self.cluster_covariances = fit_.covariances_
@@ -75,6 +100,7 @@ class gaussian_mixture():
         self.predict_ = fit_.predict
         self.clusters_low = []
         self.condition = []
+        self.confidence = []
         self.labels = self.predict_(X_low) + self.label_shift
         self.unique_labels = np.unique(self.labels)
 
@@ -145,15 +171,15 @@ class gaussian_mixture():
         #plt.savefig('cluster.svg',format="svg", transparent=True)
             
 
-    def plot_psn(self,
-                 n_average):
+    def plot_psn(self):
         """
         
         """
         color = iter(self.color)
         self.p_sn = self.multi_gaussian(self.s)
-        self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
-        self.p_s = np.sum(self.p_sn * self.p_n, axis = 0) 
+        #self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
+        self.p_s = np.sum(self.p_sn, axis = 0)#np.sum(self.p_sn * self.p_n, axis = 0) 
+        self.mixture = np.sum(self.p_sn, axis = 0)
 
         with plt.style.context(self.style_name):
             plt.figure(figsize = (self.size_plot,4))
@@ -162,12 +188,12 @@ class gaussian_mixture():
                          color = next(color),
                          label = f'{index + self.label_shift}')
         
-            plt.plot(self.s, np.sum(self.p_sn, axis = 0) , 
+            plt.plot(self.s, self.mixture, 
                      label = 'Mixture',
                      alpha = 0.3)
             plt.xlabel("Latent Space")
             plt.ylabel(r"$p(s|n)$")
-            plt.legend(ncol=3)
+            plt.legend(ncol=3, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.show()
 
     
@@ -177,7 +203,7 @@ class gaussian_mixture():
         """
         color = iter(self.color)
         #self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
-        self.p_ns = self.p_sn * self.p_n / self.p_s
+        self.p_ns = self.p_sn / self.p_s#self.p_sn * self.p_n / self.p_s
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4))
@@ -187,7 +213,7 @@ class gaussian_mixture():
                          label = f'{index + self.label_shift}')
             plt.xlabel("Latent Space")
             plt.ylabel(r"$p(n|s)$")
-            plt.legend(ncol=3)
+            plt.legend(ncol=3, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.show()
 
 
@@ -195,17 +221,16 @@ class gaussian_mixture():
         """
         
         """
-        color = iter(self.color)
+        self.confidence = np.zeros(len(self.p_sn))
+
+        for index , (p_ns, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
+            self.confidence[index] = trapezoid(y = p_ns * p_sn, x = self.s) / self.cluster_weights[index]
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4))
-            for index, (p_ns_, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
-                plt.plot(self.s, p_ns_ * p_sn, 
-                         color=next(color),
-                         label = f'{index + self.label_shift}')
-            plt.xlabel("Latent Space")
-            plt.ylabel(r"$p(n|s)$")
-            plt.legend(ncol=3)
+            plt.plot(self.unique_labels, self.confidence)
+            plt.xlabel("Photon number")
+            plt.ylabel("Confidence")
             plt.show()
 
 

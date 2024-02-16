@@ -99,9 +99,9 @@ class recurrentTriplet():
             X_noise1 = [X__ + np.random.normal(0, 0.001* i, config['internal']['size_network']) for X__ in X_]
             X = np.concatenate([X, X_noise1])
 
-        #X = X[np.max(X, axis=1) > 0]
-        #condition = np.min(X, axis=1) < -1.5
-        #X = X[condition]
+        X = X[np.max(X, axis=1) > 0]
+        condition = np.min(X, axis=1) < -1.5
+        X = X[condition]
         #condition = X[:,100] > -1.5
         #X = X[condition]
 
@@ -181,7 +181,7 @@ class recurrentTriplet():
             max_ = np.max(X_low_dim)
 
             X_low_dim = X_low_dim - min_ /(max_ - min_)
-            gm = density_gaussianMixture(X_low_dim, bw, number_cluster=25, skip=100)
+            gm = density_gaussianMixture(X_low_dim, bw, number_cluster=5, skip=100)
             if plot:
                 gm.plot_density()
                 gm.plot_cluster()
