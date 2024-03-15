@@ -14,6 +14,7 @@ from .setup.validation.tripletValidation import validation
 from .utils.files import save_all
 from .utils.clustering.kernelDensity import kernel_density
 from .utils.clustering.densityGaussianMixture import density_gaussianMixture
+from .utils.clustering.GaussianMixture2D import gaussian_mixture_2d
 
 #torch.use_deterministic_algorithms(True)
 #torch.manual_seed(42)
@@ -57,8 +58,11 @@ class recurrentTriplet():
         # Define dataset
         folder = f"{config['files']['dataset']}"
         size = config['files']['input_dimension']
+        
         files = listdir(folder)
-
+        if config['files']['dB'] != None:
+            config['files']['dB'] = [str(i) for i in config['files']['dB']]
+            files = [i for i in files if i[67:71] in config['files']['dB']]
         
         try:
             interval = config['train']["interval"]
@@ -79,8 +83,9 @@ class recurrentTriplet():
 
         try:
             if config['files']['folder_type'] == 'npy':
-                X = -1 *np.concatenate([np.load(f"{folder}/{file_name}").reshape((-1,size))[::10,interval1:interval2:skip]for file_name in files])
+                X = -1 *np.concatenate([np.load(f"{folder}/{file_name}").reshape((-1,size))[:,interval1:interval2:skip] for file_name in files])
             else:
+                #X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:w,interval1:interval2:skip] for w, file_name in zip(file_weight, files)]).astype("double")
                 X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:,interval1:interval2:skip] for file_name in files]).astype("double")
         except Exception as ex:
             print(ex)
@@ -94,14 +99,14 @@ class recurrentTriplet():
             X = (X - config['internal']['mean'])/config['internal']['std']
 
 
-        X_ = np.copy(X)
-        for i in range(3,6):
-            X_noise1 = [X__ + np.random.normal(0, 0.001* i, config['internal']['size_network']) for X__ in X_]
-            X = np.concatenate([X, X_noise1])
+        #X_ = np.copy(X)
+        #for i in range(3,6):
+        #    X_noise1 = [X__ + np.random.normal(0, 0.001* i, config['internal']['size_network']) for X__ in X_]
+        #    X = np.concatenate([X, X_noise1])
 
-        X = X[np.max(X, axis=1) > 0]
-        condition = np.min(X, axis=1) < -1.5
-        X = X[condition]
+        #X = X[np.max(X, axis=1) > 0]
+        #condition = np.min(X, axis=1) < -1.5
+        #X = X[condition]
         #condition = X[:,100] > -1.5
         #X = X[condition]
 
@@ -149,7 +154,7 @@ class recurrentTriplet():
 
 
 
-    def update_cluster(self, network, X, bw = (-5, -2, 20), plot=False):
+    def update_cluster(self, network, X, config, plot=False):
         """    
         Update the labels associated with each sample of X considering the autoencoder dimensionality reduction.
         Kernel density estimation is used to assign the labels.
@@ -175,15 +180,28 @@ class recurrentTriplet():
 
         with torch.no_grad():
             X_low_dim = network(X, encoding=True)
-            X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 1)
+            X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 2)
+            X_high_dim = X.cpu().numpy().reshape(-1, config['internal']['size_network'])
 
             min_ = np.min(X_low_dim)
             max_ = np.max(X_low_dim)
 
             X_low_dim = X_low_dim - min_ /(max_ - min_)
-            gm = density_gaussianMixture(X_low_dim, bw, number_cluster=5, skip=100)
+            gm = gaussian_mixture_2d(X_low_dim, 
+                                    X_high_dim,
+                                    number_cluster = config['train']['number_cluster'],
+                                    size_plot = 10,
+                                    dx = 1e-4,
+                                    label_shift = 0,
+                                    means_init = None,
+                                    cluster_iter = 5,
+                                    info_sweep = 1,
+                                    plot_sweep = False)
+            #gm = density_gaussianMixture(X_low_dim, config['network']['bw_cst'], 
+            #                             number_cluster=config['train']['number_cluster'], 
+            #                             skip=100)
             if plot:
-                gm.plot_density()
+                gm.plot_density(bw_adjust = 0.1)
                 gm.plot_cluster()
             
 
@@ -242,8 +260,8 @@ class recurrentTriplet():
         for epoch in tqdm(range(config['train']['epochs_triplet']) , desc="Epoch Triplet"):
             train_labels, train_means = self.update_cluster(network, 
                                                             data[train_index], 
-                                                            config['network']['bw_cst'],
-                                                            plot=True)
+                                                            config,
+                                                            plot=False)
             
             train_loss = train_Triplet(config, 
                                        network, 
@@ -256,7 +274,7 @@ class recurrentTriplet():
 
             validation_labels, validation_means = self.update_cluster(network, 
                                                                       data[validation_index], 
-                                                                      config['network']['bw_cst'])
+                                                                      config)
             validation_loss = validation(config['train']['alpha'], 
                                          network, 
                                          data[validation_index], 
@@ -270,7 +288,7 @@ class recurrentTriplet():
 
         test_labels, test_means = self.update_cluster(network, 
                                                       data[test_index], 
-                                                      config['network']['bw_cst'])
+                                                      config)
         
         test_loss, results = validation(config['train']['alpha'], 
                                         network, 

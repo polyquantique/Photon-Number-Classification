@@ -4,6 +4,7 @@ from sklearn.model_selection import ParameterGrid
 from .recurrentTriplet import recurrentTriplet
 #from .transformer import transformer
 from .fileBatch import fileBatch
+from .fileBatchtSNE import fileBatchtSNE
 
 
 
@@ -48,7 +49,7 @@ class sweep:
             
             run_config['files']['path_save'] = f"{path_save}/{name}/run {str(sweep_index).rjust(len(str(test_number)), '0')}"
             try:
-                exp = recurrentTriplet()#fileBatch()
+                exp = recurrentTriplet()#fileBatch()#fileBatchtSNE()#recurrentTriplet()
                 exp.run(run_config)
             except:
                 pass

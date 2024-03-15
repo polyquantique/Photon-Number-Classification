@@ -25,6 +25,9 @@ class confidence:
 
         # Verification of clusters
         kd.plot_cluster()
+        kd.plot_psn()
+        kd.plot_pns()
+        kd.plot_confidence()
 
         self.style_name = "seaborn-v0_8"
         self.label_shift = label_shift
@@ -60,17 +63,17 @@ class confidence:
                             number_cluster = number_cluster,
                             flip = flip, 
                             size_plot = 10,
-                            label_shift = label_shift,
-                            means_init = means_init)
+                            label_shift = label_shift)
+                            #means_init = means_init)
 
         labels = kd.predict(X_low)
         unique_labels = np.unique(labels)
         if zero_number != None:
             labels = np.concatenate([labels, np.zeros(zero_number)])
-        average_photon = np.sum(kd.cluster_weights * np.arange(label_shift))
+        average_photon = np.sum(kd.cluster_weights * unique_labels)
      
         kd.plot_cluster()
-        kd.plot_psn(average_photon)
+        kd.plot_psn()
         kd.plot_pns()
         kd.plot_confidence()
 

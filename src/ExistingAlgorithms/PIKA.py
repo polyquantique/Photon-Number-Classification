@@ -13,27 +13,30 @@ from scipy.signal import savgol_filter, wiener
 
 class PIKA():
     
-    def __init__(self, config):
+    def __init__(self, n_iter = 100,
+                       n_epoch = 10,
+                       N_mean = [2]):
         """
         TODO : Finish implementation
         """
+        self.style_name = "seaborn-v0_8"
+
         # Dataset 
-        self.folder = config['Dataset_path']
-        self.size = config['Dataset_signal_size']
+        self.size = 0
+        self.nb_samples = 0
         
         # Initial assumptions
         #self.N_mean_list = config['Average_photon_number']
         
         # Loop iteration 
-        self.optimization_iter = config['Optimization_iter']
+        self.optimization_iter = n_iter
         self.nb_cluster = 0
         
         # Normalization
-        self.objective_sigma = 0
+        self.objective_sigma = 12
 
         # Signal parameters
-        self.nb_samples = 0
-        self.N_mean = config['Average_photon_number']
+        self.N_mean = np.array(N_mean)
         self.size_clusters = []
         self.V_mean = []
 
@@ -42,31 +45,15 @@ class PIKA():
         self.O_PC = 0
 
         # Gradient descent implementation
-        self.epochs = config['Epochs']
-
-
+        self.epochs = n_epoch
         
-        
-
-    def Get_traces(self):
-
-        V = np.concatenate([np.fromfile(f"{self.folder}/{file_name}", dtype=np.float16).reshape((-1,self.size)) for file_name in listdir(self.folder)])
-        self.nb_samples = len(V)
-        index = np.arange(self.nb_samples)
-
-        V = savgol_filter(V, 10, 2)
-        #V = wiener(V, (5, 5))
-
-
-        return V.astype(float), index
-
 
 
 
 
     def Dot_product(self, V, index):
         V_mean = np.mean(V, axis = 0)
-        n_eff = self.N_mean * np.sum(V_mean * V, axis=1) / np.sum(V_mean * V_mean)
+        n_eff = self.N_mean * np.sum(V_mean * V, axis=1) / np.sum(V_mean**2)
 
         _, index = zip(*sorted(zip(n_eff, index)))
 
@@ -85,7 +72,6 @@ class PIKA():
 
         N = np.arange(lower_limit, upper_limit + 1)
         prob = poisson.pmf(N, self.N_mean)
-        #prob = np.absolute( np.exp(-self.N_mean) * self.N_mean**N / gamma(N + 1) )
         int_prob = np.rint(prob / np.sum(prob) * self.nb_samples).astype('int64')
 
         N = N[int_prob > 0]
@@ -157,7 +143,7 @@ class PIKA():
 
     def Poisson_Combinatorial_objective(self, N):
         O_PC = self.Log_Poisson_likelihood(N, self.size_clusters) + self.Log_Combinatorial_likelihood(self.size_clusters)
-        return - O_PC # Log of the likelihoods
+        return -O_PC # Log of the likelihoods
 
 
 
@@ -252,12 +238,12 @@ class PIKA():
 
     
 
-    def run_PIKA(self, plot=False):
+    def run_PIKA(self, V, plot=False):
 
         N_mean_list = []
         O_KPC_list_epoch = []
-
-        V, index = self.Get_traces()
+        self.size , self.nb_samples = V.shape
+        index = np.arange(self.nb_samples)
         
         for epoch in tqdm(range(self.epochs), desc="Epoch"):
 
@@ -311,28 +297,34 @@ class PIKA():
         if plot:
             
             # Last O_KPC
-            plt.figure()
-            plt.plot(O_KPC_list, label = r"$O_{KPC}$")
-            plt.xlabel("Successfull move")
-            plt.ticklabel_format(useOffset=False)
-            plt.legend()
-            plt.show()
+            with plt.style.context(self.style_name):
+                plt.figure()
+                plt.plot(O_KPC_list, label = r"$O_{KPC}$")
+                plt.xlabel("Successfull move")
+                plt.ticklabel_format(useOffset=False)
+                plt.legend()
+                plt.show()
             
             # Mean traces for each photon number
-            plt.figure()
-            pl = [plt.plot(wave, label=f"{N[index]}") for index, wave in enumerate(self.V_mean)]
-            plt.ticklabel_format(useOffset=False)
-            plt.legend()
-            plt.show()
+            with plt.style.context(self.style_name):
+                plt.figure()
+                pl = [plt.plot(wave, label=f"{N[index]}") for index, wave in enumerate(self.V_mean)]
+                plt.ticklabel_format(useOffset=False)
+                plt.legend()
+                plt.show()
 
-            plt.figure()
-            plt.plot(N_mean_list)
-            plt.ticklabel_format(useOffset=False)
-            plt.ylabel("Average photon number")
+            with plt.style.context(self.style_name):
+                plt.figure()
+                plt.plot(N_mean_list)
+                plt.ticklabel_format(useOffset=False)
+                plt.ylabel("Average photon number")
+                plt.show()
 
-            plt.figure()
-            plt.ticklabel_format(useOffset=False)
-            plt.plot(O_KPC_list_epoch)
-            plt.ylabel(r"$O_{KPC}$")
+            with plt.style.context(self.style_name):
+                plt.figure()
+                plt.ticklabel_format(useOffset=False)
+                plt.plot(O_KPC_list_epoch)
+                plt.ylabel(r"$O_{KPC}$")
+                plt.show()
 
         return clusters

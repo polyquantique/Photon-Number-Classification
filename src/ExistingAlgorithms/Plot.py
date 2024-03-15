@@ -13,8 +13,8 @@ def plot_1D(X_l):
 def plot_traces(X):
 
     with plt.style.context("seaborn-v0_8"):
-        plt.figure(figsize=(10,4), dpi=200)
-        [plt.plot(x, alpha = 1) for x in X[::20]]#0.01
+        plt.figure(figsize=(4,4), dpi=200)
+        [plt.plot(x, alpha = 0.01) for x in X[::20]]#
         plt.xlabel('Time (a.u.)')
         plt.ylabel('Voltage (a.u.)')
         #plt.xticks([])

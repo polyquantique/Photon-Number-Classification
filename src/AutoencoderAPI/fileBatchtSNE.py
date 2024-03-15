@@ -1,6 +1,7 @@
 import numpy as np
 from os import listdir, makedirs
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 import torch
 from sklearn.model_selection import KFold, train_test_split
@@ -153,8 +154,12 @@ class fileBatchtSNE:
 
         np.random.shuffle(TES)
 
-        method = TSNE(n_components=1, perplexity=2000)
+        method = TSNE(n_components=2, perplexity=np.sqrt(len(TES)))
         X_l = method.fit_transform(TES)
+
+        plt.figure()
+        plt.scatter(X_l[:,0], X_l[:,1],s=1,alpha=0.1)
+        plt.show()
 
         return torch.from_numpy(TES).view(-1, 1, size_network).float(), torch.from_numpy(X_l).view(-1, 1, 1).float()
 

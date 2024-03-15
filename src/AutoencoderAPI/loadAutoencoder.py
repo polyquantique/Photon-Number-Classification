@@ -45,7 +45,7 @@ def loadAutoencoder(X_init, model_path, filter=False, threshold=0.0005, flip=Fal
         X_low_dim = X_low_dim[index_list]
         X_reconst = X_reconst[index_list]
 
-    X_low_dim = X_low_dim.detach().numpy().reshape(-1, 1)
+    X_low_dim = X_low_dim.detach().numpy().reshape(-1, 2) #SHOULD BE 1 if 1d data)
     X_reconst = X_reconst.detach().numpy().reshape(-1, config_load['internal']['size_network'])
 
     X_low_dim = (X_low_dim - np.min(X_low_dim)) / (np.max(X_low_dim) - np.min(X_low_dim))

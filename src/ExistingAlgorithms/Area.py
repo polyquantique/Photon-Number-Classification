@@ -5,11 +5,11 @@ from scipy.integrate import simps
 
 def area(X_init, filter=False, threshold_cst=0.01):
 
-    threshold = np.mean(X_init[:,-3:]) + threshold_cst
-    X_init[X_init < threshold] = threshold
+    #threshold = np.mean(X_init[:,-3:]) + threshold_cst
+    X_init[X_init < threshold_cst] = threshold_cst
 
     if filter:
-        X_init = savgol_filter(X_init, 10, 4)
+        X_init = savgol_filter(X_init, 10, 3)
         
     X_low_dim = simps(X_init).reshape(-1,1)     #, dx=1
     X_reconst = np.array([None])

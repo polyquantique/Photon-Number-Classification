@@ -44,6 +44,7 @@ class build_autoencoder(nn.Module):
             "Tanh"       : nn.Tanh,
             "GLU"        : nn.GLU,
             "Threshold"  : nn.Threshold,
+            "MaxPool2d"  : nn.MaxPool2d
         }
 
         layer_list = config['network']['layer_list'].copy()
@@ -51,32 +52,38 @@ class build_autoencoder(nn.Module):
         layer_list = [input_] + layer_list + [input_]
         activation_list = config['network']['activation_list']
         network_type = config['network']['network_type']
+        if network_type == 'CNN':
+            channel_list = config['network']['CNN_channels']
         
         self.encoder = nn.Sequential()
         self.decoder = nn.Sequential()
 
         switch = True
+        #self.encoder.append(nn.Conv1d(1, 1, groups=1, kernel_size=20, padding='same'))
         for index, activation_type in enumerate(activation_list):
 
-            if layer_list[index] == 1:
+            if layer_list[index] == 2:
                 switch = False
 
             if switch:
-                if network_type == 'CNN':
-                    self.encoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-                elif network_type == 'dropout':
-                    self.encoder.append(nn.Dropout(0.1))
+                #elif network_type == 'dropout':
+                #   self.encoder.append(nn.Dropout(0.1))
                 self.encoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
+                if network_type == 'CNN':
+                    self.encoder.append(nn.Conv1d(channel_list[index], channel_list[index+1], groups=1, kernel_size=10, padding='same'))
                 self.encoder.append(activation_dict[activation_type]())
             else:
                 self.decoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
                 if network_type == 'CNN':
-                    self.decoder.append(nn.Conv1d(1, 1, kernel_size=21, stride=1, padding='same'))
-                elif network_type == 'dropout':
-                    self.encoder.append(nn.Dropout(0.1))
+                    self.decoder.append(nn.Conv1d(channel_list[index], channel_list[index+1], groups=1, kernel_size=10, padding='same'))
+                #elif network_type == 'dropout':
+                #   self.encoder.append(nn.Dropout(0.1))
                 self.decoder.append(activation_dict[activation_type]())
         
+        if network_type == 'CNN':
+            self.decoder.append(nn.Conv1d(channel_list[-2], channel_list[-1], groups=1, kernel_size=10, padding='same'))
         self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
+        #self.decoder.append(nn.Conv1d(16, 1, groups=1, kernel_size=20, padding='same'))
         #self.decoder.append(nn.Dropout(0.2))
         #print(self.encoder)
         #print(self.decoder)

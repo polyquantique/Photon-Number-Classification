@@ -82,14 +82,16 @@ def decibel_table_npy(path_data, path_dB, size, mean, std):
 
 
 
-def decibel_table_bin(path, size, string_index):
+def decibel_table_bin(path, size, string_index, dB, weights):
 
     X = []
     decibel = []
+    files = listdir(path)
+    file_weight = [int(weights[dB.index(i[67:71])] * 1_024) for i in files]
 
-    for file_name in listdir(path):
+    for  w, file_name in zip(file_weight, files):
         
-        data_temp = np.fromfile(f"{path}/{file_name}", dtype=np.float16).reshape(-1,size)
+        data_temp = np.fromfile(f"{path}/{file_name}", dtype=np.float16).reshape(-1,size)[:w]
         decibel_temp = file_name[string_index[0]:string_index[1]]
         
         X.append(data_temp)

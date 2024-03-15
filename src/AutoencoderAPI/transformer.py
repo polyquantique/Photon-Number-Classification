@@ -67,6 +67,86 @@ class transformer():
             }
         ```
         """
+
+        try:
+            if config['sweep']:
+                log_path = f"{config['files']['path_save']}/fold 0"
+        except:
+            folder_name = "/run-" + datetime.now().strftime(r"%Y-%m-%d-%H-%M")
+            log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
+        
+
+        config['internal'] = {}
+        # Define device and run on Cuda if is available
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        # Define dataset
+        folder = f"{config['files']['dataset']}"
+        size = config['files']['input_dimension']
+        
+        files = listdir(folder)
+
+       
+        # Define dataset
+        sequence = config['network']["sequence_len"]
+        config['network']["embed_dim"] = int(size / sequence)
+
+        
+        try:
+            interval = config['train']["interval"]
+            config['internal']['size_network'] = interval[1] - interval[0]
+            interval1 = interval[0]
+            interval2 = interval[1]
+        except:
+            config['internal']['size_network'] = config['files']['input_dimension']
+            interval1 = 0
+            interval2 = config['files']['input_dimension']
+
+        try:
+            skip = config['train']['skip_elements']
+            if skip < 1: skip = 1
+            config['internal']['size_network'] = int(config['internal']['size_network']/skip)
+        except:
+            skip = 1
+
+        try:
+            if config['files']['folder_type'] == 'npy':
+                X = -1 *np.concatenate([np.load(f"{folder}/{file_name}").reshape((-1,size))[:,interval1:interval2:skip] for file_name in files])
+            else:
+                #X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:w,interval1:interval2:skip] for w, file_name in zip(file_weight, files)]).astype("double")
+                X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:,interval1:interval2:skip] for file_name in files]).astype("double")
+        except Exception as ex:
+            print(ex)
+            X = -1 * np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size))[:,interval1:interval2:skip] for file_name in files]).astype("double")
+
+        try:
+            X = (X - config['internal']['mean'])/config['internal']['std']
+        except:
+            config['internal']['mean'] = np.mean(np.copy(X))
+            config['internal']['std'] = np.std(X)
+            X = (X - config['internal']['mean'])/config['internal']['std']
+
+
+        #X_ = np.copy(X)
+        #for i in range(3,6):
+        #    X_noise1 = [X__ + np.random.normal(0, 0.001* i, config['internal']['size_network']) for X__ in X_]
+        #    X = np.concatenate([X, X_noise1])
+
+        #X = X[np.max(X, axis=1) > 0]
+        #condition = np.min(X, axis=1) < -1.5
+        #X = X[condition]
+        #condition = X[:,100] > -1.5
+        #X = X[condition]
+
+            
+        data = torch.from_numpy(X).view(-1, 1, config['internal']['size_network']).float().to(self.device)
+
+
+
+
+
+
+
         try:
             if config['sweep']:
                 folder_name = ""
@@ -75,20 +155,10 @@ class transformer():
 
         log_path = f"{config['files']['path_save']}{folder_name}/fold 0"
 
-        # Define device and runs on Cuda if is available
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
 
-        # Define dataset
-        sequence = config['network']["sequence_len"]
-        size = config['files']['input_dimension']
-        config['network']["embed_dim"] = int(size / sequence)
 
-        folder = f"{config['files']['dataset']}"
-        files = listdir(folder)
-
-        X = np.concatenate([np.fromfile(f"{folder}/{file_name}", dtype=np.float16).reshape((-1,size)) for file_name in files])
-
-        data = torch.from_numpy(X).view(-1, sequence, size).float().to(self.device) #config['network']["embed_dim"]
+       
 
         return config, data, log_path
 

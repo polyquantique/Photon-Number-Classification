@@ -58,6 +58,9 @@ class fileBatch:
         folder = f"{config['files']['dataset']}"
         #files = [file_dB for index, file_dB in enumerate(listdir(folder)) if dB[index+301] == config['dB']]
         files = listdir(folder)
+        if config['files']['dB'] != None:
+            config['files']['dB'] = [str(i) for i in config['files']['dB']]
+            files = [i for i in files if i[67:71] in config['files']['dB']]
 
         fold = KFold(n_splits=config['train']['k-fold'],shuffle=True,random_state=42) 
         train_validation_files, test_files = train_test_split(files,train_size=0.9,shuffle=True)
@@ -147,8 +150,8 @@ class fileBatch:
         #    TES = TES[np.min(TES, axis=1) < -0.00002] #####
         #self.loop += 1
         
-        X_ = np.copy(TES)
-        for i in range(3,6):
+        #X_ = np.copy(TES)
+        #for i in range(3,6):
 
             #X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 0.5]
             #X_noise2 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_ if np.max(X__) > 1]
@@ -158,19 +161,19 @@ class fileBatch:
 
             #TES = np.concatenate([TES, X_noise1, X_noise2, X_noise3, X_noise4, X_noise5])
 
-            X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
+            #X_noise1 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
             #X_noise2 = [X__ + np.random.normal(0, 0.001* i, size_network) for X__ in X_]
 
 
-            TES = np.concatenate([TES, X_noise1])
+            #TES = np.concatenate([TES, X_noise1])
 
-        TES = TES[np.max(TES, axis=1) > 0]
+        #TES = TES[np.max(TES, axis=1) > 0]
 
-        condition = np.min(TES, axis=1) < -1.5
-        TES = TES[condition]
+        #condition = np.min(TES, axis=1) < -1.5
+        #TES = TES[condition]
 
-        condition = TES[:,100] > -1.5
-        TES = TES[condition]
+        #condition = TES[:,100] > -1.5
+        #TES = TES[condition]
 
         np.random.shuffle(TES)
         

@@ -82,17 +82,19 @@ class gaussian_mixture():
 
         fit_ = GaussianMixture(n_components=number_cluster, 
                             tol = 1e-5, 
-                            max_iter = 200,
+                            max_iter = 300,
                             init_params='k-means++',
-                            means_init = means_init).fit(X_low)
+                            means_init = means_init,
+                            n_init=10).fit(X_low)
         
         means_init = np.sort(fit_.means_.reshape(-1,1), axis=0)
 
         fit_ = GaussianMixture(n_components = number_cluster, 
                                tol = 1e-5, 
-                               max_iter = 200,
+                               max_iter = 300,
                                init_params='k-means++',
-                               means_init = means_init).fit(X_low)
+                               means_init = means_init,
+                               n_init=10).fit(X_low)
                 
         self.cluster_means = fit_.means_
         self.cluster_covariances = fit_.covariances_

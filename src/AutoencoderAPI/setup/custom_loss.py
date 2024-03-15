@@ -86,11 +86,11 @@ class triplet_MSE:
     def __init__(self) -> None:
         pass
 
-    def forward(self, input_, output_, negative, alpha):
+    def forward(self, output_high, input_high, output_low, positive_negative, alpha):
         trip = nn.TripletMarginLoss()
-        triplet = trip(input_, output_, negative)
+        triplet = trip(output_low, positive_negative[0], positive_negative[1])
         mse = nn.MSELoss()
-        MSE = mse(output_, input_)
+        MSE = mse(output_high, input_high)
 
         return alpha * triplet + MSE
     
@@ -128,4 +128,4 @@ class tSNE:
         mse = nn.MSELoss()
         MSE_auto = mse(output_, input_)
         
-        return  MSE_tSNE #+ MSE_auto
+        return  MSE_tSNE + MSE_auto

@@ -1,4 +1,5 @@
 import torch
+import random
 
 
 def validation(alpha, 
@@ -43,7 +44,12 @@ def validation(alpha,
         Average loss : float
             Average loss of the training process (loss of one epoch).
     """
-    negative = torch.tensor([cluster_means[index] for index in torch.roll(cluster_label,1)]).to(self.device)
+    arr = torch.arange(cluster_means.size(0))
+    negative_low = torch.tensor([torch.roll(arr, random.choice([-1,1]))[index] for index in cluster_label])
+        #positive_low = torch.tensor([cluster_means[index] for index in cluster_label])
+
+    positive_low = cluster_means[cluster_label].to(self.device)
+    negative_low = cluster_means[negative_low].to(self.device)
     cumu_loss = 0
     _ = None
 
@@ -55,27 +61,27 @@ def validation(alpha,
 
     network.eval()
     with torch.no_grad():
-        for index, data in enumerate(X):
+        for index, (positive_low_, negative_low_, input_high) in enumerate(zip(positive_low, negative_low, X)):
 
             if store:
-                encode = network(data, encoding=True)
-                decode = network(encode, decoding =True)
+                output_low = network(input_high, encoding=True)
+                output_high = network(output_low, decoding =True)
 
-                results['encode'].append(encode.cpu().clone().numpy()[0,0])
+                results['encode'].append(output_low.cpu().clone().view(-1).numpy())
 
                 if index < 2:
-                    results['input'].append(data.cpu().clone().view(-1).numpy())
-                    results['decode'].append(decode.cpu().clone().view(-1).numpy())
+                    results['input'].append(input_high.cpu().clone().view(-1).numpy())
+                    results['decode'].append(output_high.cpu().clone().view(-1).numpy())
 
             else:
-                decode = network(data)
+                output_low = network(input_high, encoding=True)
+                output_high = network(output_low, decoding =True)
             
             #current_label = cluster_label[index]
             #negative_index = torch.where(cluster_label != current_label)[0]
             #rand_index = torch.randint(negative_index.size(0), (1,))
             #negative = X[negative_index[rand_index]]
-
-            loss = criterion.forward(decode, data, _, negative[index].view(1,-1), alpha)
+            loss = criterion.forward(output_high, input_high, output_low, (positive_low_.view(1,-1) , negative_low_.view(1,-1)), alpha)
             cumu_loss += loss.item()
 
     if store:

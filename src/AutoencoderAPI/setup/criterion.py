@@ -25,8 +25,12 @@ class build_criterion:
         def generic(output_, input_, X, network, list_):
             return self.criterion(output_, input_)
 
-        def triplet(output_, input_, X, negative, param2):
-            return self.criterion(input_, output_, negative)
+        def triplet(output_high, input_high, output_low, negative_low, alpha):
+            return self.criterion(output_high, input_high, output_low, negative_low, alpha)
+
+        def triplet_MSE_(output_high, input_high, output_low, negative_low, alpha):
+            crit = self.criterion
+            return crit.forward(output_high, input_high, output_low, negative_low, alpha)
 
         def custom_with_sample(output_, input_, X, network, list_):
             X_sub = X[sample(list_, 1_000)]
@@ -47,7 +51,7 @@ class build_criterion:
             #"MarginRankingLoss"  : (nn.MarginRankingLoss() , generic),
             "KLDivLoss"          : (nn.KLDivLoss() , generic),
             "TripletMarginLoss"  : (nn.TripletMarginLoss() , triplet),
-            "TripletMSE"         : (triplet_MSE() , custom_without_sample),
+            "TripletMSE"         : (triplet_MSE() , triplet_MSE_),
             #"pytorch_kmeans_silhouette_loss"  : (pytorch_kmeans_silhouette_loss() , custom_with_sample),
             "sklearn_kernelDensity_loss"      : (sklearn_kernelDensity_loss() , custom_with_sample),
             #"sklearn_kmeans_silhouette_loss"  : (sklearn_kmeans_silhouette_loss() , custom_with_sample),

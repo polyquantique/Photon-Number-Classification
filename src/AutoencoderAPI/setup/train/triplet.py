@@ -37,17 +37,23 @@ def train(config,
         Average loss : float
                 Average loss of the training process (loss of one epoch).
         """
-        negative = torch.tensor([torch.roll(cluster_means, random.choice([-1,1]))[index] for index in cluster_label]).to(self.device)
+        arr = torch.arange(cluster_means.size(0))
+        negative_low = torch.tensor([torch.roll(arr, random.choice([-1,1]))[index] for index in cluster_label])
+        #positive_low = torch.tensor([cluster_means[index] for index in cluster_label])
+
+        positive_low = cluster_means[cluster_label].to(self.device)
+        negative_low = cluster_means[negative_low].to(self.device)
         cumu_loss = 0
         _ = None
         network.train()
         #for index, input_ in tqdm(enumerate(X), total=X.size(0)):#tqdm(enumerate(X_train),total=X_train.size(0) , desc='Train Triplet'):
-        for negative_, input_ in tqdm(zip(negative, X), total=X.size(0)):
+        for positive_low_, negative_low_, input_high in tqdm(zip(positive_low, negative_low, X), total=X.size(0)):
 
                 # Zero gradient
                 optimizer.zero_grad()
                 # Forward
-                output_ = network(input_)
+                output_low = network(input_high, encoding=True)
+                output_high = network(output_low, decoding =True)
                 # Criterion
                 #current_label = cluster_label[index]
                 
@@ -55,7 +61,7 @@ def train(config,
                 #rand_index = torch.randint(negative_index.size(0), (1,))
                 #negative = X[negative_index[rand_index]]
 
-                loss = criterion.forward(output_, input_, _, negative_.view(1,-1), config['train']['alpha'])
+                loss = criterion.forward(output_high, input_high, output_low, (positive_low_.view(1,-1) , negative_low_.view(1,-1)), config['train']['alpha'])
                 # Backward
                 loss.backward()
                 optimizer.step()
