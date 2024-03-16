@@ -15,7 +15,7 @@ def dimension_reduction(X_train, X_test, path, function, **param):
     """
     method = function(**param)
     X_i = X_test
-    file_name = f'{path}/{function}_{param}.npy'
+    file_name = f"{path}/test.npy"#{function}_{param}
 
     if os.path.isfile(file_name):
         X_l = np.load(file_name)

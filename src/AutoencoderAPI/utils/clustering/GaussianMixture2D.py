@@ -61,8 +61,11 @@ class gaussian_mixture_2d():
         self.X_low = np.array(X_low).reshape(-1,2)
         self.X_low[:,0] = (self.X_low[:,0] - self.X_low[:,0].min()) / (self.X_low[:,0].max() - self.X_low[:,0].min())
         self.X_low[:,1] = (self.X_low[:,1] - self.X_low[:,1].min()) / (self.X_low[:,1].max() - self.X_low[:,1].min())
-        self.s1 = np.arange(-0.1, 1.1, dx)
-        self.s2 = np.arange(-0.1, 1.1, dx)
+        #self.s1 = np.arange(-0.1, 1.1, dx)
+        #self.s2 = np.arange(-0.1, 1.1, dx)
+        #self.dx = dx
+        self.num = 1000
+        self.esp = 1e-10
         self.number_cluster = number_cluster
 
         # Clustering iteration metrics
@@ -90,11 +93,11 @@ class gaussian_mixture_2d():
         self.unique_labels = np.arange(self.number_cluster) + label_shift
 
         # Confidence metrics
-        self.p_s = np.zeros((self.s1.size, self.s2.size))
-        self.p_n = np.zeros(self.number_cluster)
-        self.p_sn = np.zeros((self.number_cluster, self.s1.size, self.s2.size))
-        self.p_ns = np.zeros((self.number_cluster, self.s1.size, self.s2.size))
-        self.mixture = self.p_s = np.zeros((self.s1.size, self.s2.size))
+        #self.p_s = np.zeros((self.s1.size, self.s2.size))
+        #self.p_n = np.zeros(self.number_cluster)
+        #self.p_sn = np.zeros((self.number_cluster, self.s1.size, self.s2.size))
+        #self.p_ns = np.zeros((self.number_cluster, self.s1.size, self.s2.size))
+        #self.mixture = self.p_s = np.zeros((self.s1.size, self.s2.size))
         self.confidence = np.zeros(self.number_cluster)
 
         # Trustworthiness
@@ -243,16 +246,20 @@ class gaussian_mixture_2d():
             plt.show()
             
 
-    def multi_gaussian(self):
+    def multi_gaussian(self, x, y):
         """
         
         """
-        s1, s2 = np.meshgrid(self.s1, self.s2)
-        pos = np.dstack((s1, s2))
+        multi = np.zeros((self.number_cluster, x.size, y.size))
+        x, y = np.meshgrid(x, y)
+        pos = np.dstack((x, y))
         for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
                                                                self.cluster_covariances,
                                                                self.cluster_weights)):
-            self.p_sn[index,:,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(pos)
+            #self.p_sn[index,:,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(pos)
+            multi[index,:,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(pos)
+
+        return multi
     
 
     def trapezoid_2d(self, x, y, Z):
@@ -260,46 +267,40 @@ class gaussian_mixture_2d():
         
         """
         return trapezoid(trapezoid(Z, x), y)
+        
 
-    
-    
-    
-
-    def plot_psn(self, n_average = None):
+    def plot_confidence(self, plot_int = True):
         """
         
         """
-        self.multi_gaussian(self.s1, self.s2) #definition of self.p_sn
+        
+            
+        #for index , (p_ns, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
+        for index , (mean, covariance, weight) in enumerate(zip(self.cluster_means, 
+                                                        self.cluster_covariances,
+                                                        self.cluster_weights)):
+            x = np.linspace(mean[0] - 1000*covariance[0,0],
+                            mean[0] + 1000*covariance[0,0],
+                            self.num)
+            y = np.linspace(mean[1] - 1000*covariance[1,1],
+                            mean[1] + 1000*covariance[1,1],
+                            self.num)
+            p_sn = self.multi_gaussian(x, y)
+            p_s = np.sum(p_sn, axis = 0)
+            conf_integral = p_sn[index] / (p_s + self.esp) * p_sn[index]
 
-        if n_average != None:
-            self.p_n[:] = poisson(mu = n_average).pmf(k = self.unique_labels).reshape(-1,1,1)
-            self.p_s[:,:] = np.sum(self.p_sn * self.p_n, axis = 0)
-            self.p_ns[:,:,:] = self.p_sn * self.p_n / self.p_s
-        else:
-            self.p_s[:,:] = np.sum(self.p_sn, axis = 0)
-            self.p_ns[:,:,:] = self.p_sn / self.p_s
+            if plot_int:
+                with plt.style.context(self.style_name):
+                    plt.figure(figsize=(self.size_plot,4))
+                    plt.imshow(conf_integral,
+                            cmap = 'Blues')
+                    plt.colorbar()
+                    plt.show()
 
-        self.mixture = np.sum(self.p_sn, axis = 0)
-    
-        with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4))
-            plt.imshow(self.mixture,#self.s1, self.s2, ,
-                        cmap = 'Blues',
-                        extent =[self.s1.min(), self.s1.max(), self.s2.min(), self.s2.max()])
-                            #norm = 'log')#,
-                        #interpolation ='nearest')#,
-            plt.colorbar()
+            self.confidence[index] = self.trapezoid_2d(x, y, conf_integral) / weight
+  
             plt.show()
-        
-
-    def plot_confidence(self):
-        """
-        
-        """
-
-        for index , (p_ns, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
-            #Z = p_ns * p_sn
-            self.confidence[index] = self.trapezoid_2d(self.s1, self.s2, p_ns * p_sn) / self.cluster_weights[index]
+            #(self.s1, self.s2, p_ns * p_sn) / self.cluster_weights[index]
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4))
