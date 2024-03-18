@@ -12,9 +12,7 @@ from .setup.train.generic import train as train_MSE
 from .setup.train.triplet import train as train_Triplet
 from .setup.validation.tripletValidation import validation
 from .utils.files import save_all
-from .utils.clustering.kernelDensity import kernel_density
-from .utils.clustering.densityGaussianMixture import density_gaussianMixture
-from .utils.clustering.GaussianMixture2D import gaussian_mixture_2d
+from .utils.clustering.GaussianMixture import gaussian_mixture
 
 #torch.use_deterministic_algorithms(True)
 #torch.manual_seed(42)

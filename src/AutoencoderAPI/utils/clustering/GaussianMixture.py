@@ -1,250 +1,628 @@
 import numpy as np
-import torch
-from scipy.signal import argrelextrema
+
 import matplotlib.pyplot as plt 
+import seaborn as sns
 from matplotlib import colors
-from matplotlib.pyplot import cm
+from matplotlib import cm
 from sklearn.mixture import GaussianMixture
-from sklearn.neighbors import KernelDensity
-from sklearn.model_selection import GridSearchCV
-#from math import sqrt
-from scipy.special import erf
-from numpy import sqrt, log
+from sklearn.manifold import trustworthiness
 
-from scipy.stats import norm
+from scipy.special import factorial
+from scipy.stats import multivariate_normal, poisson
 from scipy.integrate import  trapezoid
-from scipy.signal import find_peaks
+from scipy.signal import peak_widths
+from sklearn.metrics import silhouette_score
 
-#from scipy.integrate import quad
+
 
 
 class gaussian_mixture():
     """
 
+    Gaussian mixture clustering for TES samples inside a 1D or 2D latent space.
+    The procedure offers ordered clustering based on the area of the average signal for every cluster.
+    This is justified since the area is proportional to the energy and therefore photon number.
 
     Parameters
     ----------
- 
+    X_low : ndarray
+        Low dimensional representation of the samples in X_high.
+        Shape : (Number of samples , Dimension of latent space)
+    X_high : ndarray
+        High dimensional representation of the samples (initial signals).
+        Shape : (Number of samples , Dimension of the initial samples)
+    number_cluster : int
+        Initial guess for the number of clusters in the data.
+    label_shift : int
+        Label shift for the predictions. Example for `label_shift` = 1 every label will be shifted by 1.
+        This allows labels to be associated to photon numbers for cases when the method ignores 0.
+    cluster_iter : int
+        Number of initializations to perform for the Gaussian Mixture model.
+    info_sweep : int
+        Values for the different number of clusters evaluated. Example for `info_sweep` = 2 the cluster numbers from 
+        [`number_cluster` - `info_sweep` , `number_cluster` + `info_sweep`) are evaluated.
+    plot_sweep : bool
+        Boolean to plot the number of cluster analysis.
+            - Akaike information criterion (aic)
+            - Bayesian information criterion (bic)
+            - Silhouette score (silhouette)
+    size_plot : int
+        Lenght of the plots in the class.
+    dpi : int
+        Resolution of the plots in the class.
+    
 
     Returns
     -------
     None
 
     """
-    def __init__(self, X_low, 
-                 number_cluster = 1,
-                 flip = False, 
-                 size_plot = 10,
-                 dx = 1e-5,
-                 label_shift = 0,
-                 means_init = None):
+    def __init__(self, X_low : np.array,
+                 X_high : np.array,
+                 number_cluster : int = 10,
+                 label_shift : int = 0,
+                 cluster_iter : int = 10,
+                 info_sweep : int = 5,
+                 plot_sweep : bool = False,
+                 size_plot : int = 10,
+                 dpi : int = 100) -> None:
         
-        self.flip = -1 if flip else 1
-        
-        X_low = self.flip * np.array(X_low).reshape(-1,1)
-
+        # Style
         self.style_name = "seaborn-v0_8"
-        self.color = cm.GnBu_r(np.linspace(0, 1, int(1.5*number_cluster)))
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.size_plot = size_plot
+        self.dpi = dpi
+
+        # Dataset
+        self.dim = X_low.shape[1]
+        self.X_high = np.array(X_high)
+        self.X_low = X_low
+        self.eps = 1e-10 # To reduce risk of divided by 0 in discrete integral
+        self.number_cluster = number_cluster
+        for dim in range(self.dim):
+            self.X_low[:,dim] = (self.X_low[:,dim] - self.X_low[:,dim].min()) \
+                                / (self.X_low[:,dim].max() - self.X_low[:,dim].min())
+
+        assert 0 < self.dim <= 2, \
+            'The number of dimensions of X_low must be 1 or 2'
+        assert self.X_low.shape[0] == self.X_high.shape[0], \
+            'The number of sample in X_low and X_high must be equal'
+        assert self.number_cluster < self.X_low.shape[0], \
+            'The number of sample must be higher than the number of clusters'
+        
+
+        # Clustering iteration metrics
+        self.aic = np.zeros(2*info_sweep)
+        self.bic = np.zeros(2*info_sweep)
+        self.silhouette = np.zeros(2*info_sweep)
+
+        assert number_cluster - info_sweep > 1, \
+            'The number of cluster must be higher than 1'
+
+        # Initial clustering iteration (find optimal number of cluster)
+        self.clustering_iter(info_sweep = info_sweep,
+                            cluster_iter = cluster_iter,
+                            plot_sweep = plot_sweep)
+
+        # Initial clustering parameters
+        self.cluster_means = np.zeros((self.number_cluster, self.dim))
+        self.cluster_covariances = np.zeros((self.number_cluster, self.dim, self.dim))
+        self.cluster_weights = np.zeros(self.number_cluster)
+        self.predict_ = None
+
+        # Ordered clustering with initialized means
+        self.clustering_order(cluster_iter = cluster_iter)
+        
+        # Labels
         self.label_shift = label_shift
-        self.min_ = np.min(X_low)
-        self.max_ = np.max(X_low)
-        self.s = np.arange(self.min_-0.1, self.max_+0.1, dx)
-        self.len_s = len(self.s)
-        self.p_s = None 
-        self.p_n = None
-        self.p_sn = None
-        self.p_ns = None
-        self.mixture = None
+        self.labels = self.predict(self.X_low)
+        self.unique_labels = np.arange(self.number_cluster) + label_shift
+
+        # Confidence metrics
+        self.confidence = np.zeros(self.number_cluster)
+
+        # Trustworthiness
+        self.trustworthiness_eucl = np.zeros(self.number_cluster)
+        self.trustworthiness_cos = np.zeros(self.number_cluster)
+
+
+    def clustering_iter(self, info_sweep : int = 10,
+                            cluster_iter : int = 10,
+                            plot_sweep : int = False) -> None:
+        """
+        Iteration over interval [`number_cluster` - `info_sweep` , `number_cluster` + `info_sweep`) to find an optimal number of
+        clusters for Gaussian Mixture. 
+
+        Parameters
+        ----------
+        cluster_iter : int
+            Number of initializations to perform for the Gaussian Mixture model.
+        info_sweep : int
+            Values for the different number of clusters evaluated. Example for info_sweep = 2 the cluster numbers from 
+            [`number_cluster` - `info_sweep` , `number_cluster` + `info_sweep`) are evaluated.
+        plot_sweep : bool
+            Boolean to plot the number of cluster analysis.
+                - Akaike information criterion (aic)
+                - Bayesian information criterion (bic)
+                - Silhouette score (silhouette)
         
-        #if isinstance(means_init, np.ndarray):
-        #    fit_ = GaussianMixture(n_components=number_cluster, 
-        #                       tol=1e-3, 
-        #                       max_iter=200,
-        #                       means_init = means_init).fit(X_low)
-        #else:
+        Returns
+        -------
+        None
 
-        #hist = np.histogram(X_low,5000)
-        #peaks, _ = find_peaks(hist[0], prominence=90)
-        #means_init = hist[1][peaks].reshape(-1,1)
+        """
+        number_array = np.arange(self.number_cluster - info_sweep,
+                                 self.number_cluster + info_sweep)
 
-        #plt.figure()
-        #plt.scatter(hist[1][:-1], hist[0], s=1)
-        #plt.vlines(means_init, 0,100)
-        #plt.show()
+        for index, n_cluster in enumerate(number_array):
 
-        #if len(means_init) > number_cluster:
-        #    means_init = means_init[:number_cluster]
-        #else:
-        #    dif = number_cluster - len(means_init)
-        #    means_init = np.concatenate([means_init, np.random.uniform(self.min_, self.max_,dif).reshape(-1,1)])
-
-        fit_ = GaussianMixture(n_components=number_cluster, 
-                            tol = 1e-5, 
-                            max_iter = 300,
-                            init_params='k-means++',
-                            means_init = means_init,
-                            n_init=10).fit(X_low)
+            fit_ = GaussianMixture(n_components = n_cluster, 
+                                tol = 1e-3, 
+                                max_iter = 200,
+                                n_init = -(cluster_iter//-2),
+                                init_params='k-means++').fit(self.X_low)
+            
+            self.aic[index] = fit_.aic(self.X_low)
+            self.bic[index] = fit_.bic(self.X_low)
+            self.silhouette[index] = silhouette_score(self.X_low, fit_.predict(self.X_low))
         
-        means_init = np.sort(fit_.means_.reshape(-1,1), axis=0)
+        self.number_cluster = number_array[np.argmax(self.silhouette)]
 
-        fit_ = GaussianMixture(n_components = number_cluster, 
-                               tol = 1e-5, 
-                               max_iter = 300,
-                               init_params='k-means++',
-                               means_init = means_init,
-                               n_init=10).fit(X_low)
+        if plot_sweep:
+
+            with plt.style.context("seaborn-v0_8"):
+                plt.figure(figsize=(self.size_plot,4))
+                plt.scatter(self.number_cluster, self.bic[np.argmax(self.silhouette)], s = 100, label = 'Selected number')
+                plt.plot(number_array, self.aic, label='AIC')
+                plt.plot(number_array, self.bic, label='BIC')
+                plt.legend()
+                plt.show()
+
+                plt.figure(figsize=(self.size_plot,4))
+                plt.scatter(self.number_cluster, self.silhouette[np.argmax(self.silhouette)], s = 100, label = 'Selected number')
+                plt.plot(number_array, self.silhouette, label='Silhouette')
+                plt.legend()
+                plt.show()
+
+    
+    def clustering_order(self, cluster_iter : int = 10) -> None:
+        """
+        Definition of the Gaussian Mixture for the optimal number of clusters.
+        The labels are also initialized to follow photon numbers (label shift and area of the initial signals).
+
+        Parameters
+        ----------
+        cluster_iter : int
+            Number of initializations to perform for the Gaussian Mixture model.
+        
+        Returns
+        -------
+        None
+
+        """
                 
-        self.cluster_means = fit_.means_
-        self.cluster_covariances = fit_.covariances_
-        self.cluster_weights = fit_.weights_
-        self.predict_ = fit_.predict
-        self.clusters_low = []
-        self.condition = []
-        self.confidence = []
-        self.labels = self.predict_(X_low) + self.label_shift
-        self.unique_labels = np.unique(self.labels)
-
-        for label in self.unique_labels:
-            condition = self.labels == label
+        fit_ = GaussianMixture(n_components=self.number_cluster, 
+                                tol = 1e-3, 
+                                max_iter = 200,
+                                n_init = cluster_iter,
+                                init_params='k-means++').fit(self.X_low)
+                                
+        # Get area and labels
+        X_Area = trapezoid(self.X_high, axis=1).flatten()
+        predict_init = fit_.predict(self.X_low)
+        # Get average area of the clusters
+        labels = np.arange(self.number_cluster)
+        means_area = [np.mean(X_Area[predict_init == label_]) for label_ in labels]
+        # Order clusters
+        means_area , labels = zip(*sorted(zip(means_area, labels)))
+        means_init = fit_.means_[list(labels)]
         
-            cluster_low = X_low[condition]
- 
-            self.clusters_low.append(cluster_low)
-            self.condition.append(condition)
+        fit_ = GaussianMixture(n_components = self.number_cluster, 
+                            tol = 1e-3,
+                            max_iter = 200,
+                            n_init = cluster_iter,
+                            init_params = 'k-means++',
+                            means_init = means_init).fit(self.X_low)
+        
+        self.cluster_means[:,:] = fit_.means_
+        self.cluster_covariances[:,:,:] = fit_.covariances_
+        self.cluster_weights[:] = fit_.weights_
+        self.predict_ = fit_.predict
 
 
-    def predict(self, X_low):
+    def predict(self, X_low : np.array) -> np.array:
         """
         Predict the label of samples in `X_low` based on initial latent space separation.
 
         Parameters
         ----------
-        X_low : numpy.array
+        X_low : ndarray
             Array containing all the samples in their low-dimensional representation.
 
         Returns
         -------
-        None
+        labels : ndarray
+            Array containing the labels associated to the low-dimensional samples in `X_low`.
 
         """
-        X_low = self.flip * X_low
         return self.predict_(X_low) + self.label_shift
         
-    def multi_gaussian(self, x):
-        mean = self.cluster_means.reshape(-1,1)
-        variance = self.cluster_covariances.reshape(-1,1)
-        weights = self.cluster_weights.reshape(-1,1)
-        x = x.reshape(1,-1)
-        return weights * (2*np.pi*variance)**(-0.5) * np.exp(-(x - mean)**2/(2*variance))
-        
 
-    def plot_cluster(self,
-                     number_bins = 5000):
+    def plot_density(self, bw_adjust : float = 1.) -> None:
         """
-        Plot a histogram of the samples in the latent space.
-        Each sample is also labeled using the kernel density estimation.
+        Plot the kernel density estimation of the latent space.
 
         Parameters
         ----------
-        None
+        bw_adjust : float
+            Bandwidth used in the kernel density estimation.
 
         Returns
         -------
         None
 
         """
-        color = iter(self.color)
-        bins = np.linspace(self.min_, self.max_, number_bins)
+        if self.dim == 1:
 
-        with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4))
-            for index_cluster, cluster in enumerate(self.clusters_low):
-                plt.hist(cluster.flatten() , bins, 
-                         label=f"{index_cluster + self.label_shift}", 
-                         fill=True, 
-                         histtype='step',
-                         color=next(color))
-            plt.xlabel("Latent Space")
-            plt.ylabel("Counts")
-            plt.legend(ncol=3)
+            with plt.style.context(self.style_name):
+                plt.figure(figsize=(self.size_plot,4))
+                sns.kdeplot(x = np.array(self.X_low).flatten(), 
+                            cmap="Blues",   #"magma",#
+                            fill = True,
+                            bw_adjust = bw_adjust)
+            #kde.tick_params(left=False, bottom=False)
             plt.show()
-        #plt.savefig('cluster.svg',format="svg", transparent=True)
-            
 
-    def plot_psn(self):
-        """
-        
-        """
-        color = iter(self.color)
-        self.p_sn = self.multi_gaussian(self.s)
-        #self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
-        self.p_s = np.sum(self.p_sn, axis = 0)#np.sum(self.p_sn * self.p_n, axis = 0) 
-        self.mixture = np.sum(self.p_sn, axis = 0)
+        elif self.dim == 2:
 
-        with plt.style.context(self.style_name):
-            plt.figure(figsize = (self.size_plot,4))
-            for index, gaussian in enumerate(self.p_sn):
-                plt.plot(self.s, gaussian,
-                         color = next(color),
-                         label = f'{index + self.label_shift}')
-        
-            plt.plot(self.s, self.mixture, 
-                     label = 'Mixture',
-                     alpha = 0.3)
-            plt.xlabel("Latent Space")
-            plt.ylabel(r"$p(s|n)$")
-            plt.legend(ncol=3, loc='center left', bbox_to_anchor=(1, 0.5))
+            with plt.style.context(self.style_name):
+                plt.figure(figsize=(self.size_plot,4))
+                sns.kdeplot(x = self.X_low[:,0], 
+                            y = self.X_low[:,1],
+                            cmap="Blues",   
+                            fill = True,
+                            bw_adjust = bw_adjust,
+                            thresh = 0,
+                            levels = 30)
+            #kde.tick_params(left=False, bottom=False)
             plt.show()
+      
+
+    def plot_cluster(self, 
+                     plot_kde : bool = False, 
+                     number_bins : int = 1000,
+                     bw_adjust : float = 1) -> None:
+        """
+        Plot the labelled clusters in the latent space.
+
+        Parameters
+        ----------
+        plot_kde : bool
+            Boolean to plot the kernel density estimation of every cluster instead of the histogram (1D) or the scatter plot (2D).
+        number_bins : int
+            Number of bins in the histogram (1D).
+        bw_adjust : float
+            Bandwidth used in the kernel density estimation.
+
+        Returns
+        -------
+        None
+
+        """
+        if self.dim == 1:
+
+            with plt.style.context(self.style_name):
+                plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+                for index, (label, weight) in enumerate(zip(self.unique_labels, self.cluster_weights)):
+                    X = self.X_low[self.labels == label]
+                    if plot_kde:
+                        sns.kdeplot(x = np.array(X).flatten(), 
+                                    cmap="Blues", 
+                                    weights = weight,
+                                    fill = True,
+                                    bw_adjust = bw_adjust,
+                                    label = f"{index + self.label_shift}")
+                    else:
+                        plt.hist(X , 
+                                bins = np.linspace(0, 1, number_bins), 
+                                label = f"{index + self.label_shift}", 
+                                fill = True, 
+                                histtype = 'step')
+                plt.xlabel("Latent Space")
+                plt.ylabel("Counts")
+                plt.legend(ncol=3)
+                plt.show()
+
+        elif self.dim == 2:
+
+            with plt.style.context(self.style_name):
+                fig = plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+                ax = fig.add_subplot()
+                for index, (label, mean) in enumerate(zip(self.unique_labels, self.cluster_means)):
+                    X = self.X_low[self.labels == label]
+                    if plot_kde:
+                        sns.kdeplot(x = X[:,0], 
+                            y = X[:,1],
+                            fill = False,
+                            bw_adjust = bw_adjust)
+                    else:
+                        ax.scatter(x = X[:,0], 
+                                y = X[:,1],
+                                s = 1,
+                                alpha = 0.1)
+                    ax.text(mean[0]-0.01,mean[1]-0.01, index)
+                plt.ylabel(r'$s_2$')
+                plt.xlabel(r'$s_1$')
+                plt.show()
+
 
     
-    def plot_pns(self):
+    
+    def multi_gaussian_1d(self, x : np.array, 
+                                axis : any = None) -> np.array:
+        """
+
+        Create a numpy array of shape (`number_cluster` , `x.size`) containing a discret 1D gaussian for every cluster, 
+        considering the Gaussian mixture parameters.
+
+        Parameters
+        ----------
+        x : ndarray
+            Interval of the latent space where the confidence integration is mainly contained.
+        axis : int
+            Axis to consider in the case of 1D confidence evaluation for a 2D latent space. 
+
+        Returns
+        -------
+        multi_gaussian : ndarray
+            Array of shape (`number_cluster` , `x.size`) containing a discret 1D gaussian for every cluster
+
+        """
+        multi_gaussian = np.zeros((self.number_cluster, x.size))
+        
+        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
+                                                               self.cluster_covariances,
+                                                               self.cluster_weights)):
+            if axis != None:
+                mean = mean[axis]
+                covariance = covariance[axis,axis]
+            else:
+                pass
+
+            multi_gaussian[index,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(x)
+
+        return multi_gaussian
+
+    
+    def multi_gaussian_2d(self, x : np.array, 
+                                y : np.array) -> np.array:
         """
         
+        Create a numpy array of shape (`number_cluster` , `x.size`, `y.size`) containing a discrete 2D Gaussian for every cluster, 
+        considering the Gaussian mixture parameters.
+
+        Parameters
+        ----------
+        x : ndarray
+            Interval in the first dimension of the latent space where the confidence integration is mainly contained.
+        y : ndarray
+            Interval in the second dimension of the latent space where the confidence integration is mainly contained.
+
+        Returns
+        -------
+        multi_gaussian : ndarray
+            Array of shape (`number_cluster` , `x.size`) containing a discreet 1D Gaussian for every cluster
+
         """
-        color = iter(self.color)
-        #self.p_n = (np.exp(-n_average) * (n_average**self.unique_labels) / factorial(self.unique_labels)).reshape(-1,1)
-        self.p_ns = self.p_sn / self.p_s#self.p_sn * self.p_n / self.p_s
+        multi_gaussian = np.zeros((self.number_cluster, x.size, y.size))
+        x, y = np.meshgrid(x, y)
+        pos = np.dstack((x, y))
 
-        with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4))
-            for index, p_ns_ in enumerate(self.p_ns):
-                plt.plot(self.s, p_ns_, 
-                         color=next(color),
-                         label = f'{index + self.label_shift}')
-            plt.xlabel("Latent Space")
-            plt.ylabel(r"$p(n|s)$")
-            plt.legend(ncol=3, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.show()
+        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
+                                                               self.cluster_covariances,
+                                                               self.cluster_weights)):
+            multi_gaussian[index,:,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(pos)
 
+        return multi_gaussian
+    
 
-    def plot_confidence(self):
+    def trapezoid_2d(self, x : np.array, 
+                           y : np.array, 
+                           Z : np.array) -> np.array:
         """
         
-        """
-        self.confidence = np.zeros(len(self.p_sn))
+        Extention of the scipy trapezoid integration. 
 
-        for index , (p_ns, p_sn) in enumerate(zip(self.p_ns, self.p_sn)):
-            self.confidence[index] = trapezoid(y = p_ns * p_sn, x = self.s) / self.cluster_weights[index]
+        Parameters
+        ----------
+        x : ndarray
+            Interval in the first dimension of the latent space where the confidence integration is mainly contained.
+        y : ndarray
+            Interval in the second dimension of the latent space where the confidence integration is mainly contained.
+        Z : ndarray
+            Values of a function considering the grid associated to `x` and `y`.
+
+        Returns
+        -------
+        integral : ndarray
+            Numerical integral of Z.
+
+        """
+        return trapezoid(trapezoid(Z, x), y)
+    
+
+    def plot_confidence_1d(self, axis : any = None,
+                                 n_points : int = 1000,
+                                 size_zone : float = 1000.,
+                                 plot_int : bool = False) -> None:
+        """
+
+        1D confidence metric following :
+
+        P. C. Humphreys et al., ‘Tomography of photon-number resolving continuous-output detectors’, 
+        New J. Phys., vol. 17, no. 10, p. 103044, Oct. 2015, doi: 10.1088/1367-2630/17/10/103044.
+        
+        Parameters
+        ----------
+        axis : any
+            Axis to consider in the case of 1D confidence evaluation for a 2D latent space. 
+        n_points : int
+            Number of points in the latent space discretization.
+        size_zone : float
+            Size of the latent space used to approximate the integral. 
+            The value multiplies the variance for every cluster.
+        plot_int : bool
+            Plot the discrete function in the latent space for every cluster.
+            This can be used to make sure the integrated function in contained in the evaluated interval.
+
+        Returns
+        -------
+        None
+
+        """
+        for index , (mean, covariance, weight) in enumerate(zip(self.cluster_means, 
+                                                        self.cluster_covariances,
+                                                        self.cluster_weights)):
+            
+            if self.dim > 1:
+                x = np.linspace(mean[axis] - size_zone*covariance[axis,axis],
+                                mean[axis] + size_zone*covariance[axis,axis],
+                                n_points).flatten()
+            else:
+                x = np.linspace(mean - size_zone*covariance,
+                                mean + size_zone*covariance,
+                                n_points).flatten()
+            
+            p_sn = self.multi_gaussian_1d(x, axis = axis)
+            p_s = np.sum(p_sn, axis = 0)
+            conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
+
+            if plot_int:
+                with plt.style.context(self.style_name):
+                    plt.figure(figsize=(self.size_plot,4))
+                    plt.plot(x, conf_integral)
+                    plt.show()
+
+            self.confidence[index] = trapezoid(x = x, y = conf_integral) / weight
+
 
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4))
-            plt.plot(self.unique_labels, self.confidence)
+            plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+            plt.plot(self.unique_labels[:-1], self.confidence[:-1])
+            plt.title(f"1D confidence over axis {axis}")
             plt.xlabel("Photon number")
             plt.ylabel("Confidence")
             plt.show()
 
-
-    def plot_traces(self, X):
+    
+    def plot_confidence_2d(self, n_points : int = 1000,
+                                 size_zone : float = 1000,
+                                 plot_int : bool = False):
         """
-        Plot the traces `X` and label them by following the order of the low-dimensional representation
+
+        2D confidence metric following :
+
+        P. C. Humphreys et al., ‘Tomography of photon-number resolving continuous-output detectors’, 
+        New J. Phys., vol. 17, no. 10, p. 103044, Oct. 2015, doi: 10.1088/1367-2630/17/10/103044.
+        
+        Parameters
+        ----------
+        n_points : int
+            Number of points in the latent space discretization.
+        size_zone : float
+            Size of the latent space used to approximate the integral. 
+            The value multiplies the variance for every cluster.
+        plot_int : bool
+            Plot the discrete function in the latent space for every cluster.
+            This can be used to make sure the integrated function in contained in the evaluated interval.
+
+        Returns
+        -------
+        None
+
+        """
+        for index , (mean, covariance, weight) in enumerate(zip(self.cluster_means, 
+                                                        self.cluster_covariances,
+                                                        self.cluster_weights)):
+            
+            x = np.linspace(mean[0] - size_zone*covariance[0,0],
+                            mean[0] + size_zone*covariance[0,0],
+                            n_points)
+            y = np.linspace(mean[1] - size_zone*covariance[1,1],
+                            mean[1] + size_zone*covariance[1,1],
+                            n_points)
+            
+            p_sn = self.multi_gaussian_2d(x, y)
+            p_s = np.sum(p_sn, axis = 0)
+            conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
+
+            if plot_int:
+                with plt.style.context(self.style_name):
+                    plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+                    plt.imshow(conf_integral, cmap = 'Blues')
+                    plt.colorbar()
+                    plt.show()
+
+            self.confidence[index] = self.trapezoid_2d(x, y, conf_integral) / weight
+
+
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+            plt.plot(self.unique_labels[:-1], self.confidence[:-1])
+            plt.title(f"2D confidence")
+            plt.xlabel("Photon number")
+            plt.ylabel("Confidence")
+            plt.show()
+
+    
+    def plot_trustworthiness(self):
+        """
+
+        Trustworthiness using Euclidian and Cosine distances.
+
+        Trustworthiness following :
+
+        J. Venna et S. Kaski, “Neighborhood preservation in nonlinear projection methods: An experimental study,”
+        dans Artificial Neural Networks — ICANN 2001, ser. Lecture Notes in Computer Science, G. Dorffner,
+        H. Bischof et K. Hornik,  ́edit. Springer, p. 485–491.
+
+        The scikit learn implementation is used :
+
+        ‘sklearn.manifold.trustworthiness’, scikit-learn. Accessed: Mar. 18, 2024. [Online]. 
+        Available: https://scikit-learn/stable/modules/generated/sklearn.manifold.trustworthiness.html
+        
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        """
+        for index, label in enumerate(self.unique_labels):
+            X_low = self.X_low[self.labels <= label]
+            X_high = self.X_high[self.labels <= label]
+
+            self.trustworthiness_eucl[index] = trustworthiness(X_high, X_low, metric="euclidean")
+            self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
+        
+        with plt.style.context(self.style_name):
+            plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+            plt.plot(self.unique_labels, self.trustworthiness_eucl, label='Euclidean')
+            plt.plot(self.unique_labels, self.trustworthiness_eucl, label='Cosine')
+            plt.xlabel("Photon number")
+            plt.ylabel("Trustworthiness")
+            plt.show()
+
+
+    def plot_traces(self):
+        """
+        Plot the traces `X_high` and label them by following the order of the low-dimensional representation
         given in the initialization process.  
 
         Parameters
         ----------
-        X : numpy.array
-            Array containing all the samples.
+        None
 
         Returns
         -------
@@ -252,16 +630,14 @@ class gaussian_mixture():
 
         """
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4)) #, dpi=100
-            n =len(self.condition)
-            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
+            plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+            #color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster)))) 
             
-            for condition in self.condition:
-                cluster = X[condition]
-                c = next(color)
+            for label in self.unique_labels:
+                cluster = self.X_high[self.labels == label]
+                #c = next(color)
                 if len(cluster) > 1000: cluster = cluster[:1000]
-                for i, _ in enumerate(cluster):
-                    plt.plot(cluster[i], alpha=0.05, c=c)# c="#8dd3c7")
+                plt.plot(cluster, alpha=0.05)#, c=c)
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -269,15 +645,14 @@ class gaussian_mixture():
         #plt.savefig('traces.svg',format="svg", transparent=True)
 
 
-    def plot_traces_average(self, X):
+    def plot_traces_average(self):
         """
         Plot the traces average and labels them by following the order of the low-dimensional representation
         given in the initialization process.  
 
         Parameters
         ----------
-        X : numpy.array
-            Array containing all the samples.
+        None
 
         Returns
         -------
@@ -285,14 +660,12 @@ class gaussian_mixture():
 
         """
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.size_plot,4)) #, dpi=100
-            n =len(self.condition)
-            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*n)))) 
+            plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
+            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster)))) 
             
-            for condition in self.condition:
-                cluster = X[condition]
+            for label in self.unique_labels:
+                cluster = self.X_high[self.labels == label]
                 c = next(color)
-                if len(cluster) > 1000: cluster = cluster[:1000]
                 plt.plot(np.mean(cluster, axis=0), c=c)
 
             plt.xlabel("Time (a.u.)")
@@ -300,11 +673,5 @@ class gaussian_mixture():
             plt.show()
             #plt.savefig('average_traces.svg',format="svg", transparent=True)
 
-
-    def normalize_latent(self, X_l, number):
-
-        try: 
-            return X_l / (self.cluster_means[number] - self.cluster_means[0])
-        except:
-            return X_l 
-        
+    
+  
