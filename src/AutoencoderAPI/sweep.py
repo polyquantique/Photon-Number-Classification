@@ -49,7 +49,7 @@ class sweep:
             
             run_config['files']['path_save'] = f"{path_save}/{name}/run {str(sweep_index).rjust(len(str(test_number)), '0')}"
             try:
-                exp = recurrentTriplet()#fileBatch()#fileBatchtSNE()#recurrentTriplet()
+                exp = fileBatch()#fileBatch()#fileBatchtSNE()#recurrentTriplet()
                 exp.run(run_config)
             except:
                 pass
@@ -73,7 +73,7 @@ class sweep:
 
             if ('network','layer_size_possibility') in sweep_config['search_param']:
                 layer_list = choices(sweep_config['layer_size_possibility'], k = layer_number // 2)                
-                run_config['network']['layer_list'] = layer_list + [1] + list(reversed(layer_list))
+                run_config['network']['layer_list'] = layer_list + [2] + list(reversed(layer_list))
                 print(run_config['network']['layer_list'])
 
             for (category, parameter) in sweep_config['search_param']:

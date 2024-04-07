@@ -62,7 +62,7 @@ class build_autoencoder(nn.Module):
         #self.encoder.append(nn.Conv1d(1, 1, groups=1, kernel_size=20, padding='same'))
         for index, activation_type in enumerate(activation_list):
 
-            if layer_list[index] == 2:
+            if layer_list[index] == 1:#2
                 switch = False
 
             if switch:

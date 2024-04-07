@@ -178,23 +178,21 @@ class recurrentTriplet():
 
         with torch.no_grad():
             X_low_dim = network(X, encoding=True)
-            X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 2)
+            X_low_dim = X_low_dim.cpu().numpy().reshape(-1, 1)#.reshape(-1, 1)
             X_high_dim = X.cpu().numpy().reshape(-1, config['internal']['size_network'])
 
             min_ = np.min(X_low_dim)
             max_ = np.max(X_low_dim)
 
             X_low_dim = X_low_dim - min_ /(max_ - min_)
-            gm = gaussian_mixture_2d(X_low_dim, 
-                                    X_high_dim,
-                                    number_cluster = config['train']['number_cluster'],
-                                    size_plot = 10,
-                                    dx = 1e-4,
-                                    label_shift = 0,
-                                    means_init = None,
-                                    cluster_iter = 5,
-                                    info_sweep = 1,
-                                    plot_sweep = False)
+            gm = gaussian_mixture(X_low_dim,
+                                  X_high_dim,
+                                  number_cluster = config['train']['number_cluster'],
+                                  cluster_iter = 20,
+                                  info_sweep = 0,
+                                  plot_sweep = False,
+                                  label_shift = 0)
+                      
             #gm = density_gaussianMixture(X_low_dim, config['network']['bw_cst'], 
             #                             number_cluster=config['train']['number_cluster'], 
             #                             skip=100)

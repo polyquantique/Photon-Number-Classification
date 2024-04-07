@@ -154,7 +154,7 @@ class fileBatchtSNE:
 
         np.random.shuffle(TES)
 
-        method = TSNE(n_components=2, perplexity=np.sqrt(len(TES)))
+        method = TSNE(n_components=2, perplexity=2*np.sqrt(len(TES)))
         X_l = method.fit_transform(TES)
 
         plt.figure()

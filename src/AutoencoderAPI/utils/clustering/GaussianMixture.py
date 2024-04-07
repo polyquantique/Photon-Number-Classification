@@ -1,19 +1,15 @@
 import numpy as np
+import seaborn as sns
 
 import matplotlib.pyplot as plt 
-import seaborn as sns
-from matplotlib import colors
 from matplotlib import cm
+
 from sklearn.mixture import GaussianMixture
 from sklearn.manifold import trustworthiness
-
-from scipy.special import factorial
-from scipy.stats import multivariate_normal, poisson
-from scipy.integrate import  trapezoid
-from scipy.signal import peak_widths
 from sklearn.metrics import silhouette_score
 
-
+from scipy.stats import multivariate_normal, poisson
+from scipy.integrate import  trapezoid
 
 
 class gaussian_mixture():
@@ -70,6 +66,7 @@ class gaussian_mixture():
         # Style
         self.style_name = "seaborn-v0_8"
         self.size_plot = size_plot
+        self.gridsize_density = 20_000
         self.dpi = dpi
 
         # Dataset
@@ -88,15 +85,18 @@ class gaussian_mixture():
             'The number of sample in X_low and X_high must be equal'
         assert self.number_cluster < self.X_low.shape[0], \
             'The number of sample must be higher than the number of clusters'
-        
-
-        # Clustering iteration metrics
-        self.aic = np.zeros(2*info_sweep)
-        self.bic = np.zeros(2*info_sweep)
-        self.silhouette = np.zeros(2*info_sweep)
-
         assert number_cluster - info_sweep > 1, \
             'The number of cluster must be higher than 1'
+        
+        if info_sweep > 0:
+            size_sweep = 2*info_sweep
+        else:
+            size_sweep = 1
+
+        # Clustering iteration metrics
+        self.aic = np.zeros(size_sweep)
+        self.bic = np.zeros(size_sweep)
+        self.silhouette = np.zeros(size_sweep)
 
         # Initial clustering iteration (find optimal number of cluster)
         self.clustering_iter(info_sweep = info_sweep,
@@ -118,7 +118,8 @@ class gaussian_mixture():
         self.unique_labels = np.arange(self.number_cluster) + label_shift
 
         # Confidence metrics
-        self.confidence = np.zeros(self.number_cluster)
+        self.confidence_1D = np.zeros(self.number_cluster)
+        self.confidence_2D = np.zeros(self.number_cluster)
 
         # Trustworthiness
         self.trustworthiness_eucl = np.zeros(self.number_cluster)
@@ -150,8 +151,11 @@ class gaussian_mixture():
         None
 
         """
-        number_array = np.arange(self.number_cluster - info_sweep,
-                                 self.number_cluster + info_sweep)
+        if info_sweep > 0:
+            number_array = np.arange(self.number_cluster - info_sweep,
+                                     self.number_cluster + info_sweep)
+        else:
+            number_array = np.array([self.number_cluster])
 
         for index, n_cluster in enumerate(number_array):
 
@@ -170,18 +174,39 @@ class gaussian_mixture():
         if plot_sweep:
 
             with plt.style.context("seaborn-v0_8"):
-                plt.figure(figsize=(self.size_plot,4))
-                plt.scatter(self.number_cluster, self.bic[np.argmax(self.silhouette)], s = 100, label = 'Selected number')
-                plt.plot(number_array, self.aic, label='AIC')
-                plt.plot(number_array, self.bic, label='BIC')
-                plt.legend()
-                plt.show()
+                fig, axes = plt.subplots(nrows = 1, ncols = 2, figsize = (self.size_plot,4))
+                axes[0].plot(number_array, self.aic, label='AIC')
+                axes[0].plot(number_array, self.bic, label='BIC')
+                axes[0].scatter(x = self.number_cluster, 
+                                y = self.aic[np.argmax(self.silhouette)], 
+                                s = 100,
+                                zorder = 10,
+                                marker = 'X')
+                axes[0].scatter(x = self.number_cluster, 
+                                y = self.bic[np.argmax(self.silhouette)], 
+                                s = 100, 
+                                label = 'Selected number',
+                                zorder = 10,
+                                marker = 'X')
+                axes[0].set_ylabel('AIC / BIC')
+                axes[0].set_xlabel('Number of cluster')
+                axes[0].set_xticks(number_array[::4])
+                axes[0].legend()
 
-                plt.figure(figsize=(self.size_plot,4))
-                plt.scatter(self.number_cluster, self.silhouette[np.argmax(self.silhouette)], s = 100, label = 'Selected number')
-                plt.plot(number_array, self.silhouette, label='Silhouette')
-                plt.legend()
-                plt.show()
+                axes[1].plot(number_array, self.silhouette, label = 'Silhouette')
+                axes[1].scatter(x = self.number_cluster, 
+                                y = self.silhouette[np.argmax(self.silhouette)], 
+                                s = 100, 
+                                label = 'Selected number',
+                                zorder = 10,
+                                marker = 'X')
+                axes[1].set_ylabel('Silhouette score')
+                axes[1].set_xlabel('Number of cluster')
+                axes[1].set_xticks(number_array[::4])
+                axes[1].legend()
+
+                fig.tight_layout()
+                fig.show()
 
     
     def clustering_order(self, cluster_iter : int = 10) -> None:
@@ -217,11 +242,11 @@ class gaussian_mixture():
         means_init = fit_.means_[list(labels)]
         
         fit_ = GaussianMixture(n_components = self.number_cluster, 
-                            tol = 1e-3,
-                            max_iter = 200,
-                            n_init = cluster_iter,
-                            init_params = 'k-means++',
-                            means_init = means_init).fit(self.X_low)
+                                tol = 1e-3,
+                                max_iter = 200,
+                                n_init = cluster_iter,
+                                init_params = 'k-means++',
+                                means_init = means_init).fit(self.X_low)
         
         self.cluster_means[:,:] = fit_.means_
         self.cluster_covariances[:,:,:] = fit_.covariances_
@@ -247,7 +272,9 @@ class gaussian_mixture():
         return self.predict_(X_low) + self.label_shift
         
 
-    def plot_density(self, bw_adjust : float = 1.) -> None:
+    def plot_density(self, bw_adjust : float = 1.,
+                           bw_adjust_x : float = 1.,
+                           bw_adjust_y : float = 1.) -> None:
         """
         Plot the kernel density estimation of the latent space.
 
@@ -255,6 +282,10 @@ class gaussian_mixture():
         ----------
         bw_adjust : float
             Bandwidth used in the kernel density estimation.
+        bw_adjust_x : float
+            Bandwidth used in the 2D kernel density estimation (x plot).
+        bw_adjust_y : float
+            Bandwidth used in the 2D kernel density estimation (y plot).
 
         Returns
         -------
@@ -268,23 +299,42 @@ class gaussian_mixture():
                 sns.kdeplot(x = np.array(self.X_low).flatten(), 
                             cmap="Blues",   #"magma",#
                             fill = True,
-                            bw_adjust = bw_adjust)
+                            bw_adjust = bw_adjust,
+                            gridsize = self.gridsize_density)
             #kde.tick_params(left=False, bottom=False)
+            plt.ylabel('Density')
+            plt.xlabel('Latent space')
             plt.show()
 
         elif self.dim == 2:
 
             with plt.style.context(self.style_name):
                 plt.figure(figsize=(self.size_plot,4))
+                g = sns.JointGrid(x = self.X_low[:,0], 
+                                  y = self.X_low[:,1],
+                                  space = 0)
+                g = g.plot_joint(sns.kdeplot, 
+                                 cmap = 'Blues',
+                                 bw_adjust = bw_adjust,
+                                 fill = True, 
+                                 thresh = 0,
+                                 levels = 30)
                 sns.kdeplot(x = self.X_low[:,0], 
-                            y = self.X_low[:,1],
-                            cmap="Blues",   
+                            cmap = 'Blues',
                             fill = True,
-                            bw_adjust = bw_adjust,
-                            thresh = 0,
-                            levels = 30)
-            #kde.tick_params(left=False, bottom=False)
-            plt.show()
+                            bw_adjust = bw_adjust_x, 
+                            ax = g.ax_marg_x,
+                            gridsize = self.gridsize_density)
+                sns.kdeplot(y = self.X_low[:,1], 
+                            cmap = 'Blues',
+                            fill = True,
+                            bw_adjust = bw_adjust_y, 
+                            ax = g.ax_marg_y,
+                            gridsize = self.gridsize_density)
+                #kde.tick_params(left=False, bottom=False)
+                plt.ylabel('Dimension 2 of the latent space')
+                plt.xlabel('Dimension 1 of the latent space')
+                plt.show()
       
 
     def plot_cluster(self, 
@@ -316,11 +366,12 @@ class gaussian_mixture():
                     X = self.X_low[self.labels == label]
                     if plot_kde:
                         sns.kdeplot(x = np.array(X).flatten(), 
-                                    cmap="Blues", 
                                     weights = weight,
                                     fill = True,
                                     bw_adjust = bw_adjust,
-                                    label = f"{index + self.label_shift}")
+                                    label = f"{index + self.label_shift}",
+                                    gridsize = self.gridsize_density)
+
                     else:
                         plt.hist(X , 
                                 bins = np.linspace(0, 1, number_bins), 
@@ -328,7 +379,8 @@ class gaussian_mixture():
                                 fill = True, 
                                 histtype = 'step')
                 plt.xlabel("Latent Space")
-                plt.ylabel("Counts")
+                if plot_kde: plt.ylabel("Density")
+                else : plt.ylabel("Counts")
                 plt.legend(ncol=3)
                 plt.show()
 
@@ -337,21 +389,23 @@ class gaussian_mixture():
             with plt.style.context(self.style_name):
                 fig = plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
                 ax = fig.add_subplot()
+                if plot_kde:
+                    sns.kdeplot(x = self.X_low[:,0], 
+                        y = self.X_low[:,1],
+                        fill = True,
+                        cmap = "Blues",
+                        thresh = 0,
+                        bw_adjust = bw_adjust,
+                        levels = 30)
                 for index, (label, mean) in enumerate(zip(self.unique_labels, self.cluster_means)):
                     X = self.X_low[self.labels == label]
-                    if plot_kde:
-                        sns.kdeplot(x = X[:,0], 
+                    ax.scatter(x = X[:,0], 
                             y = X[:,1],
-                            fill = False,
-                            bw_adjust = bw_adjust)
-                    else:
-                        ax.scatter(x = X[:,0], 
-                                y = X[:,1],
-                                s = 1,
-                                alpha = 0.1)
+                            s = 1,
+                            alpha = 0.02)
                     ax.text(mean[0]-0.01,mean[1]-0.01, index)
-                plt.ylabel(r'$s_2$')
-                plt.xlabel(r'$s_1$')
+                plt.xlabel('Dimension 1 of the latent space')
+                plt.ylabel('Dimension 2 of the latent space')
                 plt.show()
 
 
@@ -450,7 +504,8 @@ class gaussian_mixture():
         return trapezoid(trapezoid(Z, x), y)
     
 
-    def plot_confidence_1d(self, axis : any = None,
+    def plot_confidence_1d(self, average_poisson : float = None,
+                                 axis : any = None,
                                  n_points : int = 1000,
                                  size_zone : float = 1000.,
                                  plot_int : bool = False) -> None:
@@ -463,6 +518,9 @@ class gaussian_mixture():
         
         Parameters
         ----------
+        average_poisson : float
+            Average photon number considering an expected Poisson distribution (will be included in the 
+            definition of the confidence). 
         axis : any
             Axis to consider in the case of 1D confidence evaluation for a 2D latent space. 
         n_points : int
@@ -494,7 +552,12 @@ class gaussian_mixture():
             
             p_sn = self.multi_gaussian_1d(x, axis = axis)
             p_s = np.sum(p_sn, axis = 0)
-            conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
+
+            if average_poisson != None:
+                p_n = poisson(mu = average_poisson).pmf(k = self.unique_labels) 
+                conf_integral = p_sn[index] * p_n / (p_s + self.eps) * p_sn[index]
+            else:
+                conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
 
             if plot_int:
                 with plt.style.context(self.style_name):
@@ -502,19 +565,20 @@ class gaussian_mixture():
                     plt.plot(x, conf_integral)
                     plt.show()
 
-            self.confidence[index] = trapezoid(x = x, y = conf_integral) / weight
+            self.confidence_1D[index] = trapezoid(x = x, y = conf_integral) / weight
 
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
-            plt.plot(self.unique_labels[:-1], self.confidence[:-1])
+            plt.plot(self.unique_labels[:-1], self.confidence_1D[:-1])
             plt.title(f"1D confidence over axis {axis}")
             plt.xlabel("Photon number")
             plt.ylabel("Confidence")
             plt.show()
 
     
-    def plot_confidence_2d(self, n_points : int = 1000,
+    def plot_confidence_2d(self, average_poisson : float = None,
+                                 n_points : int = 1000,
                                  size_zone : float = 1000,
                                  plot_int : bool = False):
         """
@@ -526,6 +590,9 @@ class gaussian_mixture():
         
         Parameters
         ----------
+        average_poisson : float
+            Average photon number considering an expected Poisson distribution (will be included in the 
+            definition of the confidence). 
         n_points : int
             Number of points in the latent space discretization.
         size_zone : float
@@ -553,7 +620,12 @@ class gaussian_mixture():
             
             p_sn = self.multi_gaussian_2d(x, y)
             p_s = np.sum(p_sn, axis = 0)
-            conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
+
+            if average_poisson != None:
+                p_n = poisson(mu = average_poisson).pmf(k = self.unique_labels) 
+                conf_integral = p_sn[index] * p_n / (p_s + self.eps) * p_sn[index]
+            else:
+                conf_integral = p_sn[index] / (p_s + self.eps) * p_sn[index]
 
             if plot_int:
                 with plt.style.context(self.style_name):
@@ -562,12 +634,12 @@ class gaussian_mixture():
                     plt.colorbar()
                     plt.show()
 
-            self.confidence[index] = self.trapezoid_2d(x, y, conf_integral) / weight
+            self.confidence_2D[index] = self.trapezoid_2d(x, y, conf_integral) / weight
 
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
-            plt.plot(self.unique_labels[:-1], self.confidence[:-1])
+            plt.plot(self.unique_labels[:-1], self.confidence_2D[:-1])
             plt.title(f"2D confidence")
             plt.xlabel("Photon number")
             plt.ylabel("Confidence")
@@ -612,6 +684,7 @@ class gaussian_mixture():
             plt.plot(self.unique_labels, self.trustworthiness_eucl, label='Cosine')
             plt.xlabel("Photon number")
             plt.ylabel("Trustworthiness")
+            plt.legend()
             plt.show()
 
 
@@ -629,15 +702,14 @@ class gaussian_mixture():
         None
 
         """
+        color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster))))
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
-            #color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster)))) 
-            
             for label in self.unique_labels:
                 cluster = self.X_high[self.labels == label]
-                #c = next(color)
+                c = next(color)
                 if len(cluster) > 1000: cluster = cluster[:1000]
-                plt.plot(cluster, alpha=0.05)#, c=c)
+                [plt.plot(i, alpha=0.05, c=c) for i in cluster]
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -659,10 +731,9 @@ class gaussian_mixture():
         None
 
         """
+        color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster))))
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.size_plot,4), dpi=self.dpi)
-            color = iter(cm.GnBu_r(np.linspace(0, 1, int(1.5*self.number_cluster)))) 
-            
             for label in self.unique_labels:
                 cluster = self.X_high[self.labels == label]
                 c = next(color)

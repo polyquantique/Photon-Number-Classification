@@ -191,7 +191,7 @@ def load_sweep_results(file_name, parameters):
         parameter2[index] = config_file['train'][parameters[1]]
         loss_sweep[index] = (loss_cum / fold_len)
 
-        if loss_sweep[-1] < min_loss:   #< min_loss:
+        if loss_sweep[-1] < min_loss:   
             min_loss = loss_sweep[-1]
             min_parameter1 = parameter1[-1]
             min_parameter2 = parameter2[-1]
@@ -202,7 +202,7 @@ def load_sweep_results(file_name, parameters):
     y = np.unique(parameter2)
     #X,Y = np.meshgrid(x,y)
     
-    print("min : ", min_loss)
+    print(f"min : {min_loss}")
     print(f"file : {min_file}")
     print(f"{parameters[0]} : ", min_parameter1)
     print(f"{parameters[1]} : ", min_parameter2)
@@ -230,8 +230,8 @@ def load_sweep_results(file_name, parameters):
 
     Z = np.array(loss_sweep).reshape(len(x), len(y)).T  # Transpose added here
 
-    #plt.pcolormesh(X,Y,Z)
-    plt.imshow(Z, norm=colors.LogNorm(), extent=[np.min(parameter1), np.max(parameter1), np.min(parameter2), np.max(parameter2)])  # Added extent to show correct axis scales
+    #plt.pcolormesh(X,Y,Z) , norm=colors.LogNorm()
+    plt.imshow(Z)#, extent=[np.min(parameter1), np.max(parameter1), np.min(parameter2), np.max(parameter2)])  # Added extent to show correct axis scales
     plt.xlabel(parameters[0])
     plt.ylabel(parameters[1])
     plt.xticks(np.arange(len(x)), labels=x)
