@@ -75,18 +75,18 @@ class build_autoencoder(nn.Module):
             else:
                 self.decoder.append(nn.Linear(layer_list[index], layer_list[index+1]))
                 if network_type == 'CNN':
-                    self.decoder.append(nn.Conv1d(channel_list[index], channel_list[index+1], groups=1, kernel_size=10, padding='same'))
+                    self.decoder.append(nn.ConvTranspose1d(channel_list[index], channel_list[index+1], groups=1, kernel_size=10, padding=0, output_padding=0))
                 #elif network_type == 'dropout':
                 #   self.encoder.append(nn.Dropout(0.1))
                 self.decoder.append(activation_dict[activation_type]())
         
         if network_type == 'CNN':
-            self.decoder.append(nn.Conv1d(channel_list[-2], channel_list[-1], groups=1, kernel_size=10, padding='same'))
+            self.decoder.append(nn.ConvTranspose1d(channel_list[-2], channel_list[-1], groups=1, kernel_size=10, padding=0, output_padding=0))
         self.decoder.append(nn.Linear(layer_list[-2], layer_list[-1]))
         #self.decoder.append(nn.Conv1d(16, 1, groups=1, kernel_size=20, padding='same'))
         #self.decoder.append(nn.Dropout(0.2))
-        #print(self.encoder)
-        #print(self.decoder)
+        print(self.encoder)
+        print(self.decoder)
 
 
     def forward(self, X, encoding=False, decoding=False, both=False) -> any:
