@@ -1,0 +1,1 @@
+{"dim_emb": 2, "perplexity": null, "n_epochs": 20, "dev": "cuda", "early_exaggeration": 0, "early_exaggeration_constant": 12, "learning_rate": 0.001, "alpha_loss": 0, "batch_size": 256}
