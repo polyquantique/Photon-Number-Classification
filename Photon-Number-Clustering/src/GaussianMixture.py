@@ -319,7 +319,7 @@ class gaussian_mixture():
         if self.dim == 1:
 
             with plt.style.context(self.style_name):
-                plt.figure(figsize=(self.size_plot,4))
+                plt.figure(figsize=(6,3))#self.size_plot,4))
                 sns.kdeplot(x = np.array(self.X_low).flatten(), 
                             cmap="Blues",   #"magma",#
                             fill = True,

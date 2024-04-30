@@ -105,11 +105,11 @@ def dataset_TES(weights,
 
     if plot_expected:
         with plt.style.context("seaborn-v0_8"):
-            plt.figure(figsize=(10,4), dpi=100)
+            plt.figure(figsize=(6,3), dpi=100)
             plt.bar(x = n_arr, 
                     height = expected_prob,
                     alpha = 0.5, 
-                    edgecolor = 'k', 
+                    #edgecolor = 'k', 
                     zorder=2)
             plt.ylabel('Counts')
             plt.xlabel('Photon number')
