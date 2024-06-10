@@ -256,9 +256,14 @@ class gaussian_mixture():
         # Order labels based on photon number 
         index_sorted = np.argsort(np.array([np.mean(X_Area[predict_init == label_]) for label_ in labels]))
         
-        self.cluster_means = fit_.means_[index_sorted]
-        self.cluster_covariances = fit_.covariances_[index_sorted]
-        self.cluster_weights = fit_.weights_[index_sorted]
+        fit_.means_ = fit_.means_[index_sorted]
+        fit_.covariances_ = fit_.covariances_[index_sorted]
+        fit_.weights_ = fit_.weights_[index_sorted]
+
+        self.cluster_means = fit_.means_
+        self.cluster_covariances = fit_.covariances_
+        self.cluster_weights = fit_.weights_
+        # self.self.precisions_cholesky_ = fit_
         self.predict_ = fit_.predict 
 
 
