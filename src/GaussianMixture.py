@@ -81,7 +81,7 @@ class gaussian_mixture():
         self.levels = 10
         self.width_plot = width_plot
         self.height_plot = height_plot
-        self.gridsize_density = 1000
+        self.gridsize_density = 500
         self.min_log = 1e-2 # Bottom ylim when plotting (avoid plotting small values in log)
         self.dpi = dpi
         self.seed = seed
@@ -255,15 +255,14 @@ class gaussian_mixture():
         labels = np.arange(self.number_cluster)
         # Order labels based on photon number 
         index_sorted = np.argsort(np.array([np.mean(X_Area[predict_init == label_]) for label_ in labels]))
-        
+        # Update Gaussian Mixture parameters
         fit_.means_ = fit_.means_[index_sorted]
         fit_.covariances_ = fit_.covariances_[index_sorted]
         fit_.weights_ = fit_.weights_[index_sorted]
-
+        
         self.cluster_means = fit_.means_
         self.cluster_covariances = fit_.covariances_
         self.cluster_weights = fit_.weights_
-        # self.self.precisions_cholesky_ = fit_
         self.predict_ = fit_.predict 
 
 
@@ -272,10 +271,10 @@ class gaussian_mixture():
         Delete cluster based on index.
         """
 
-        self.cluster_means = np.delete(self.cluster_means, number_clusters).reshape(-1,1)
-        self.unique_labels = np.delete(self.unique_labels, number_clusters)
+        self.cluster_means = np.delete(self.cluster_means, number_clusters, axis=0).reshape(-1,self.dim)
+        self.unique_labels = np.delete(self.unique_labels, number_clusters, axis=0)
 
-        self.number_cluster -= 1
+        self.number_cluster -= len(number_clusters)
 
         self.clustering_order(cluster_iter = self.cluster_iter,
                               means_init = self.cluster_means)
@@ -286,10 +285,10 @@ class gaussian_mixture():
         Insert cluster between two existing clusters.
         """
 
-        self.cluster_means = np.insert(self.cluster_means, number_clusters, positions)
-        self.unique_labels = np.insert(self.unique_labels, number_clusters, positions)
+        self.cluster_means = np.insert(self.cluster_means, number_clusters, positions, axis=0)
+        self.unique_labels = np.insert(self.unique_labels, number_clusters, positions, axis=0)
 
-        self.number_cluster += 1
+        self.number_cluster += len(number_clusters)
 
         self.clustering_order(cluster_iter = self.cluster_iter,
                               means_init = self.cluster_means)
@@ -315,7 +314,8 @@ class gaussian_mixture():
         return self.predict_(X_low) + self.label_shift
         
 
-    def plot_density(self, bw_adjust : float = 1.,
+    def plot_density(self, bins_number : int = 1000,
+                           bw_adjust : float = 1.,
                            plot_scale : str = 'log',
                            plot_gaussians : bool = True) -> None:
         """
@@ -323,12 +323,12 @@ class gaussian_mixture():
 
         Parameters
         ----------
+        bins_number : int
+            Number of bins in histogram plot
         bw_adjust : float
-            Bandwidth used in the kernel density estimation.
-        bw_adjust_x : float
-            Bandwidth used in the 2D kernel density estimation (x plot).
-        bw_adjust_y : float
-            Bandwidth used in the 2D kernel density estimation (y plot).
+            Bandwidth used in kernel density estimation.
+        plot_scale : str
+            Scale used in plot (follow matplotlib norm)
         sides : bool
             Bollean to plot 1D side views of the 2D space.
 
@@ -352,15 +352,26 @@ class gaussian_mixture():
                                 gaussian[index], 
                                 linewidth = 1, 
                                 label = f"{index + self.label_shift}")
+                        
+                # hist, edges = np.histogram(a = self.X_low.flatten(),
+                #                            bins = bins_number,
+                #                            density = True)
+                
+                # plt.bar(x = edges[:-1], 
+                #         height = hist, 
+                #         width = np.diff(edges), 
+                #         align = 'edge',
+                #         alpha = 0.2)
 
                 sns.kdeplot(x = np.array(self.X_low).flatten(), 
                             cmap = self.cmap,  
                             fill = True,
                             bw_adjust = bw_adjust,
                             gridsize = self.gridsize_density)
+
                 
-                plt.ylim(bottom = self.min_log)
                 plt.yscale(plot_scale)
+                plt.ylim(bottom = self.min_log, top=1e2)
                 plt.ylabel('Density')
                 plt.xlabel('Latent space')
                 plt.legend(loc='center left', bbox_to_anchor=(1,0.5), ncol = 3)
@@ -373,24 +384,29 @@ class gaussian_mixture():
                 Y_gauss = np.linspace(0,1,self.gridsize_density)
                 gaussian = self.multi_gaussian_2d(X_gauss, Y_gauss)
 
+
             #with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.width_plot), dpi=self.dpi)
-            # plt.hist2d(x = self.X_low[:,0], 
-            #             y = self.X_low[:,1], 
-            #             norm = LogNorm(clip=True),
-            #             bins=1000,
-            #             cmap = self.cmap)
+
+            plt.hist2d(x = self.X_low[:,0],
+                    y = self.X_low[:,1],
+                    bins = bins_number,
+                    density = True,
+                    cmap = self.cmap)
+
+            if plot_gaussians:
+                for index in range(self.number_cluster):
+                    plt.contour(X_gauss,
+                                Y_gauss,
+                                gaussian[index],
+                                alpha = 0.5,
+                                levels = [gaussian[index].max()/2],
+                                linewidths = 1,
+                                colors = 'w')
+        
             
-            h, x, y, p = plt.hist2d(self.X_low[:,0], 
-                                    self.X_low[:,1], 
-                                    bins = self.gridsize_density)
-            plt.clf()
-            plt.close()
-            plt.imshow(h, 
-                       origin = "lower", 
-                       interpolation = "gaussian",
-                       cmap = self.cmap,
-                       extent=[-0.1,1.1,-0.1,1.1])
+            
+            # with plt.style.context(self.style_name):
             # sns.kdeplot(x = self.X_low[:,0], 
             #             y = self.X_low[:,1], 
             #             cmap = self.cmap,
@@ -398,7 +414,8 @@ class gaussian_mixture():
             #             norm = LogNorm(vmin=self.eps, clip=True),
             #             bw_adjust = bw_adjust,
             #             thresh = self.min_log,
-            #             levels = self.levels)
+            #             levels = self.levels,
+            #             gridsize = self.gridsize_density)
                 
             for index, mean in enumerate(self.cluster_means):
                 if index == self.cluster_means.shape[0]-1:
@@ -406,17 +423,15 @@ class gaussian_mixture():
                 else:
                     plt.text(mean[0]+0.03,mean[1], index, color = self.text_color)
             
-            plt.colorbar()
+            #plt.colorbar()
             plt.xlabel(r'$s_1$')
             plt.ylabel(r'$s_2$')
-            #kde.tick_params(left=False, bottom=False)
-            
             plt.show()
       
 
     def plot_cluster(self, 
                      plot_kde : bool = False, 
-                     number_bins : int = 1000,
+                     bins : int = 1000,
                      bw_adjust : float = 1,
                      plot_scale : str = 'log') -> None:
         """
@@ -426,7 +441,7 @@ class gaussian_mixture():
         ----------
         plot_kde : bool
             Boolean to plot the kernel density estimation of every cluster instead of the histogram (1D) or the scatter plot (2D).
-        number_bins : int
+        bins : int
             Number of bins in the histogram (1D).
         bw_adjust : float
             Bandwidth used in the kernel density estimation.
@@ -453,7 +468,7 @@ class gaussian_mixture():
 
                     else:
                         plt.hist(X , 
-                                bins = np.linspace(0, 1, number_bins), 
+                                bins = np.linspace(0, 1, bins), 
                                 label = f"{index + self.label_shift}", 
                                 fill = True, 
                                 histtype = 'step')
@@ -770,12 +785,15 @@ class gaussian_mixture():
         None
 
         """
-        for index, label in enumerate(self.unique_labels):
-            X_low = self.X_low[self.labels <= label]
-            X_high = self.X_high[self.labels <= label]
+        #for index, label in enumerate(self.unique_labels):
+        label = self.unique_labels[-1]
+        index = -1
+        
+        X_low = self.X_low[self.labels <= label]
+        X_high = self.X_high[self.labels <= label]
 
-            self.trustworthiness_eucl[index] = trustworthiness(X_high, X_low, metric="euclidean")
-            self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
+        self.trustworthiness_eucl[index] = trustworthiness(X_high, X_low, metric="euclidean")
+        self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
         
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)

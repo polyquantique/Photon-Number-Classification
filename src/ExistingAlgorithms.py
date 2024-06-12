@@ -10,7 +10,7 @@ from .Utils import norm, plot_traces
 
 def sklearn_available(X_train : np.array, 
                      X_test : np.array, 
-                     path : str, 
+                     path_save : str, 
                      function, 
                      **param):
     """
@@ -26,7 +26,7 @@ def sklearn_available(X_train : np.array,
         Training dataset.
     X_test : ndarray
         Testing dataset.
-    path : str
+    path_save : str
         Path when the results are stored and loaded.
     function : Sklearn method
         Dimensionality reduction method that is executed.
@@ -41,8 +41,8 @@ def sklearn_available(X_train : np.array,
     
     """
     method = function(**param)
-    file_name = f"{function}_{param}.npy"
-    file_name = f"{path}/{''.join(file_name.split('.')[3:])}"
+    file_name = f"{function}_{param}"
+    file_name = f"{path_save}/{''.join(file_name.split('.')[3:])}.npy"
     file_name = file_name.replace('<','')
     file_name = file_name.replace('>','')
     file_name = file_name.replace(':','')
