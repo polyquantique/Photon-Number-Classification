@@ -10,8 +10,8 @@ from sklearn.mixture import GaussianMixture
 from sklearn.manifold import trustworthiness
 from sklearn.metrics import silhouette_score
 
-from scipy.stats import multivariate_normal, poisson
-from scipy.integrate import trapezoid
+from scipy.stats import multivariate_normal, poisson, uniform, gennorm
+from scipy.integrate import trapz
 
 
 class gaussian_mixture():
@@ -76,9 +76,9 @@ class gaussian_mixture():
         
         # Style
         self.style_name = "seaborn-v0_8"
-        self.cmap = 'mako'#'magma' #'Blues'
-        self.text_color = 'white'
-        self.levels = 10
+        self.cmap = 'Blues'#'mako'#'magma' #'Blues'
+        self.text_color = 'k'#'white'
+        self.levels = 30
         self.width_plot = width_plot
         self.height_plot = height_plot
         self.gridsize_density = 500
@@ -250,7 +250,7 @@ class gaussian_mixture():
         # Get prediction
         predict_init = fit_.predict(self.X_low)
         # Get area and labels
-        X_Area = trapezoid(self.X_high, axis=1).flatten()
+        X_Area = trapz(self.X_high, axis=1).flatten()
         # Get average area of the clusters
         labels = np.arange(self.number_cluster)
         # Order labels based on photon number 
@@ -317,7 +317,8 @@ class gaussian_mixture():
     def plot_density(self, bins_number : int = 1000,
                            bw_adjust : float = 1.,
                            plot_scale : str = 'log',
-                           plot_gaussians : bool = True) -> None:
+                           plot_gaussians : bool = True,
+                           plot_uniform : bool = False) -> None:
         """
         Plot the kernel density estimation of the latent space.
 
@@ -343,6 +344,10 @@ class gaussian_mixture():
                 X_gauss = np.linspace(0,1,self.gridsize_density)
                 gaussian = self.multi_gaussian_1d(X_gauss)
 
+            if plot_uniform:
+                X_uniform = np.linspace(0,1,self.gridsize_density)
+                uniform_ = self.multi_uniform_1d(X_uniform)
+
             with plt.style.context(self.style_name):
                 plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
 
@@ -352,6 +357,14 @@ class gaussian_mixture():
                                 gaussian[index], 
                                 linewidth = 1, 
                                 label = f"{index + self.label_shift}")
+                
+                if plot_uniform:
+                    for index in range(self.number_cluster):
+                        plt.plot(X_uniform,
+                                uniform_[index], 
+                                linewidth = 1, 
+                                label = f"{index + self.label_shift}")
+
                         
                 # hist, edges = np.histogram(a = self.X_low.flatten(),
                 #                            bins = bins_number,
@@ -371,7 +384,8 @@ class gaussian_mixture():
 
                 
                 plt.yscale(plot_scale)
-                plt.ylim(bottom = self.min_log, top=1e2)
+                if plot_scale == 'log':
+                    plt.ylim(bottom = self.min_log, top=1e2)
                 plt.ylabel('Density')
                 plt.xlabel('Latent space')
                 plt.legend(loc='center left', bbox_to_anchor=(1,0.5), ncol = 3)
@@ -388,11 +402,11 @@ class gaussian_mixture():
             #with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.width_plot), dpi=self.dpi)
 
-            plt.hist2d(x = self.X_low[:,0],
-                    y = self.X_low[:,1],
-                    bins = bins_number,
-                    density = True,
-                    cmap = self.cmap)
+            # plt.hist2d(x = self.X_low[:,0],
+            #         y = self.X_low[:,1],
+            #         bins = bins_number,
+            #         density = True,
+            #         cmap = self.cmap)
 
             if plot_gaussians:
                 for index in range(self.number_cluster):
@@ -401,21 +415,21 @@ class gaussian_mixture():
                                 gaussian[index],
                                 alpha = 0.5,
                                 levels = [gaussian[index].max()/2],
-                                linewidths = 1,
-                                colors = 'w')
+                                linewidths = 0.5,
+                                colors = 'k')
         
             
             
             # with plt.style.context(self.style_name):
-            # sns.kdeplot(x = self.X_low[:,0], 
-            #             y = self.X_low[:,1], 
-            #             cmap = self.cmap,
-            #             fill = True,
-            #             norm = LogNorm(vmin=self.eps, clip=True),
-            #             bw_adjust = bw_adjust,
-            #             thresh = self.min_log,
-            #             levels = self.levels,
-            #             gridsize = self.gridsize_density)
+            sns.kdeplot(x = self.X_low[:,0], 
+                        y = self.X_low[:,1], 
+                        cmap = self.cmap,
+                        fill = True,
+                        #norm = LogNorm(),
+                        bw_adjust = bw_adjust,
+                        thresh = 0,#self.min_log,
+                        levels = self.levels,
+                        gridsize = self.gridsize_density)
                 
             for index, mean in enumerate(self.cluster_means):
                 if index == self.cluster_means.shape[0]-1:
@@ -545,6 +559,45 @@ class gaussian_mixture():
         return multi_gaussian
 
     
+    def multi_uniform_1d(self, x : np.array, axis : any = None) -> np.array:
+        """
+
+        Create a numpy array of shape (`number_cluster` , `x.size`) containing a discret 1D uniform for every cluster, 
+        considering the Gaussian mixture parameters.
+
+        Parameters
+        ----------
+        x : ndarray
+            Interval of the latent space where the confidence integration is mainly contained.
+        axis : int
+            Axis to consider in the case of 1D confidence evaluation for a 2D latent space. 
+
+        Returns
+        -------
+        multi_gaussian : ndarray
+            Array of shape (`number_cluster` , `x.size`) containing a discret 1D gaussian for every cluster
+
+        """
+        multi_uniform = np.zeros((self.number_cluster, x.size))
+        
+        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
+                                                               self.cluster_covariances,
+                                                               self.cluster_weights)):
+            if axis != None:
+                mean = mean[axis]
+                covariance = covariance[axis,axis]
+            else:
+                pass
+            # a = mean - np.sqrt(3*covariance)
+            # b = mean + np.sqrt(3*covariance)
+            #loc = mean - 6 * np.sqrt(covariance)
+            #scale =  np.sqrt(12*covariance)
+            multi_uniform[index,:] = weight * uniform(loc = mean - np.sqrt(3*covariance), scale = 2* np.sqrt(3*covariance)).pdf(x)
+            #multi_uniform[index,:] = weight * gennorm(mean = mean, cov = covariance, beta = 8).pdf(x)
+
+        return multi_uniform
+
+    
     def multi_gaussian_2d(self, x : np.array, 
                                 y : np.array) -> np.array:
         """
@@ -599,15 +652,16 @@ class gaussian_mixture():
             Numerical integral of Z.
 
         """
-        return trapezoid(trapezoid(Z, x), y)
+        return trapz(trapz(Z, x), y)
     
 
     def plot_confidence_1d(self, average_poisson : float = None,
                                  expected_prob : any = None,
                                  axis : any = None,
-                                 n_points : int = 1000,
-                                 size_zone : float = 1000.,
-                                 plot_int : bool = False) -> None:
+                                 n_points : int = 5000,
+                                 size_zone : float = 2000.,
+                                 plot_int : bool = False,
+                                 use_uniform : bool = False) -> None:
         """
 
         1D confidence metric following :
@@ -651,7 +705,10 @@ class gaussian_mixture():
                                 mean + size_zone*covariance,
                                 n_points).flatten()
             
-            p_sn = self.multi_gaussian_1d(x, axis = axis)
+            if use_uniform:
+                p_sn = self.multi_uniform_1d(x, axis = axis)
+            else:
+                p_sn = self.multi_gaussian_1d(x, axis = axis)
 
             if average_poisson is not None:
                 p_n = poisson(mu = average_poisson).pmf(k = self.unique_labels) 
@@ -671,7 +728,7 @@ class gaussian_mixture():
                     plt.plot(x, conf_integral)
                     plt.show()
 
-            self.confidence_1D[index] = trapezoid(x = x, y = conf_integral) / weight
+            self.confidence_1D[index] = trapz(x = x, y = conf_integral) / weight
 
 
         with plt.style.context(self.style_name):
@@ -792,8 +849,8 @@ class gaussian_mixture():
         X_low = self.X_low[self.labels <= label]
         X_high = self.X_high[self.labels <= label]
 
-        self.trustworthiness_eucl[index] = trustworthiness(X_high, X_low, metric="euclidean")
-        self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
+        self.trustworthiness_eucl[index] = trustworthiness(X_high, X_low, metric="euclidean", n_neighbors=200)
+        #self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
         
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)

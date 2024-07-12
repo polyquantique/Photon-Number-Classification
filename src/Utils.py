@@ -44,6 +44,7 @@ def norm(X : np.array):
     
     """
     return (X - X.min()) / (X.max() - X.min())
+    #return (X - X.mean()) / (X.std())
 
 
 def save_results(gm, 

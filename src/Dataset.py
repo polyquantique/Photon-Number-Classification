@@ -26,8 +26,9 @@ dB = [ 7.,   7.5,  8.,   8.5,  9.,   9.5, 10.,  10.5, 11.,  11.5, 12.,  12.5, 13
 
 
 def dataset_TES(weights,
-                path_test = r'/home/nicolasdc/files/Photon-Number-Classification/src/Datasets/TES/NIST test/',
-                path_train = r'/home/nicolasdc/files/Photon-Number-Classification/src/Datasets/TES/NIST train/',
+                path_test = r'/home/nicolasdc/Documents/publish/src/Datasets/TES/NIST test/',
+                path_train = r'/home/nicolasdc/Documents/publish/src/Datasets/TES/NIST train/',
+                path_random_index = r'/home/nicolasdc/Documents/publish/src/Results TES (Uniform)/randomIndexUniform.npy',
                 signal_size = 8192,
                 interval = [0,270],
                 n_photon_number = 100,
@@ -89,9 +90,14 @@ def dataset_TES(weights,
             data_train = X_train
             data_test = X_test
         
-        np.random.seed(42)
-        np.random.shuffle(data_train)
-        np.random.shuffle(data_test)
+        #np.random.seed(42)
+        #np.random.shuffle(data_train)
+        #np.random.shuffle(data_test)
+
+        # Shuffle based on reference index for reproducable results on different hardware
+        random_index = np.load(path_random_index)
+        data_train = data_train[random_index]
+        data_test = data_test[random_index]
 
     
     expected_prob = np.zeros(n_photon_number)

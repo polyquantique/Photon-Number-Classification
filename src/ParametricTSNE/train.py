@@ -3,7 +3,8 @@ import json
 from math import log2
 from typing import Optional
 from scipy import signal
-import os
+from os.path import isdir
+from os import makedirs
 import matplotlib.pyplot as plt
 
 import torch
@@ -212,38 +213,59 @@ def loss_function_KL(p_joint : Tensor,
     return (p_joint * log((p_joint + EPS) / (q_joint + EPS))).sum()
 
 
-def loss_function_MSE(X_high : Tensor,
+def loss_function_L1(X_high : Tensor,
                     X_reconst : Tensor):
-    loss = nn.MSELoss()
-    return loss(X_high, X_reconst) / torch.norm(X_high)
+    loss = nn.L1Loss()
+    return loss(X_high, X_reconst) 
 
 
 def loss_function_position(X_low : Tensor,
-                           n_cluster : Tensor):
-    #X_low = (X_low - X_low.min()) / (X_low.max() - X_low.min())
-    X_low = torch.sigmoid(X_low)
-    #means = torch.linspace(0,1,n_cluster)
-    #std = 1 / (6*n_cluster)
+                           n_cluster : Tensor,
+                           size_gauss : float,
+                           dev):
+
+    X_low = X_low[:,0].view(-1,1)
+
+    if X_low.min() == X_low.max():
+        loss = 2
+    else:
+        X_low = (X_low - X_low.min()) / (X_low.max() - X_low.min())
+
+    means = torch.linspace(0,1,n_cluster).to(torch.device(dev))
+    std = 1 / (size_gauss*n_cluster)
     #desired_dist = torch.logsumexp( (X_low - torch.linspace(0,1,n_cluster)) / (var2) , dim=1) #1/(np.pi*var2) * 
     #X_test = torch.linspace(-2,2,10_000).view(-1,1)
-    #desired_dist = torch.sum(torch.exp(- 0.5 * ((X_test - means) / std) ** 2), dim=1) #
-    desired_dist = torch.from_numpy(signal.square(2 * np.pi * n_cluster * X_low.detach().numpy()))**2
-    loss = torch.sum(desired_dist)
+    desired_dist = torch.logsumexp(- 0.5 * ((X_low - means) / std) ** 2, dim=1) #
+    #desired_dist = torch.from_numpy(1 + signal.square(2 * np.pi * n_cluster * X_low.detach().numpy()))**2
+    loss = torch.mean(torch.abs(desired_dist))#desired_dist.max() - 
+
 
     # with plt.style.context("seaborn-v0_8"):
         
-    #     plt.scatter(X_low.detach().numpy().flatten(), desired_dist.detach().numpy().flatten(), alpha=0.8, s=1)
+    #     plt.scatter(X_low.cpu().detach().numpy().flatten(), desired_dist.cpu().detach().numpy().flatten(), alpha=0.8, s=1)
     #     plt.show()
+    #
+        
     
-    return loss  #TODO find operation for 
+    return loss  
+
+
+def loss_area(X_low : Tensor,
+              X_high : Tensor):
+    
+    return None
+
+
     
 
 def loss_total(loss_KL,
-            loss_MSE,
+            loss_L1,
             loss_position,
-            alpha_loss : float = 1):
+            alpha_pos : float = 1,
+            alpha_l1 : float = 1,
+            alpha_KL : float = 1):
 
-    return loss_MSE +  alpha_loss * loss_KL + loss_position
+    return alpha_l1 * loss_L1 +  alpha_pos * loss_position + alpha_KL * loss_KL 
 
     
 
@@ -257,7 +279,10 @@ def train_ptsne(# Data
                 # Training
                 n_epochs : int,
                 learning_rate : float = 0.002,
-                alpha_loss : float = 1,
+                alpha_pos : float = 1,
+                alpha_l1 : float = 1,
+                alpha_KL : float = 1,
+                size_gauss : float = 4,
                 batch_size : int = 1024,
                 n_cluster : int = 10,
                 # Files
@@ -327,6 +352,21 @@ def train_ptsne(# Data
     assert n_samples % batch_size == 0, \
         f'The number of samples should be divisible by the batch number (got {n_samples}/{batch_size})'
 
+    folder_path = f'{save_dir_path}/{model_name}'
+
+    model_path = f'{folder_path}/model.pt'
+    loss_path = f'{folder_path}/loss.npy'
+    config_path = f'{folder_path}/config.json'
+    
+    if isdir(folder_path):
+        model.load_state_dict(torch.load(model_path))
+        epoch_losses = list(np.load(loss_path))
+    else:
+        epoch_losses = []
+        #makedirs(folder_path, exist_ok=True)
+
+    model = model.to(device(dev))
+
     opt = torch.optim.Adam(model.parameters(), lr = learning_rate)
 
     model.train()
@@ -335,14 +375,13 @@ def train_ptsne(# Data
         model_name = model_name
     else:
         model_name = get_random_string(6)
-    epoch_losses = []
-
-    train_dl = torch.from_numpy(X_high).view(n_samples, input_dimens).float().to(torch.device(dev))
+    
+    train_dl = torch.from_numpy(X_high).view(n_samples, input_dimens).float()
     train_dl = (train_dl - train_dl.min()) / (train_dl.max() - train_dl.min())
 
     for epoch in tqdm(range(n_epochs), disable = not verbose):
         train_loss_KL = 0
-        train_loss_MSE = 0
+        train_loss_L1 = 0
         train_loss_pos = 0
         train_loss_tot = 0
         epoch_start_time = datetime.datetime.now()
@@ -351,63 +390,65 @@ def train_ptsne(# Data
         index = torch.randperm(len_)
         index_split = torch.split(index, batch_size)
 
+
         # For every batch
         for batch_index in index_split:
 
             #orig_points_batch, _ = list_with_batch
-            orig_points_batch = train_dl[batch_index]
+            orig_points_batch = train_dl[batch_index].to(torch.device(dev))
             
             # Calculate conditional probability matrix in higher-dimensional space for the batch
 
             # Regular parametric t-SNE
-            if perplexity is not None:
-                target_entropy = log2(perplexity)
-                p_cond_in_batch = get_optimized_p_cond(X_high = orig_points_batch,
-                                                        target_entropy = target_entropy,
-                                                        EPS = EPS,
-                                                        dist_func = dist_func_name,
-                                                        tol = bin_search_tol,
-                                                        max_iter = bin_search_max_iter,
-                                                        min_allowed_sig_sq = min_allowed_sig_sq,
-                                                        max_allowed_sig_sq = max_allowed_sig_sq,
-                                                        dev = dev)
+            if alpha_KL != 0:
+                if perplexity is not None:
+                    target_entropy = log2(perplexity)
+                    p_cond_in_batch = get_optimized_p_cond(X_high = orig_points_batch,
+                                                            target_entropy = target_entropy,
+                                                            EPS = EPS,
+                                                            dist_func = dist_func_name,
+                                                            tol = bin_search_tol,
+                                                            max_iter = bin_search_max_iter,
+                                                            min_allowed_sig_sq = min_allowed_sig_sq,
+                                                            max_allowed_sig_sq = max_allowed_sig_sq,
+                                                            dev = dev)
 
-                if p_cond_in_batch is None:
-                    continue
-                p_joint_in_batch = get_sym_joint(cond_prob = p_cond_in_batch, 
-                                                EPS = EPS)
-
-            # Multiscale parametric t-SNE
-            else:
-                max_entropy = round(log2(batch_size / 2))
-                mscl_p_joint_in_batch = zeros(batch_size, batch_size).to(device(dev))
-                
-                for n_different_entropies, h in enumerate(range(1, max_entropy)):
-                    p_cond_for_h = get_optimized_p_cond(X_high = orig_points_batch.view(-1, input_dimens),
-                                                        target_entropy = h,
-                                                        EPS = EPS,
-                                                        dist_func = dist_func_name,
-                                                        tol = bin_search_tol,
-                                                        max_iter = bin_search_max_iter,
-                                                        min_allowed_sig_sq = min_allowed_sig_sq,
-                                                        max_allowed_sig_sq = max_allowed_sig_sq,
-                                                        dev = dev)
-                    
-                    if p_cond_for_h is None:
+                    if p_cond_in_batch is None:
                         continue
+                    p_joint_in_batch = get_sym_joint(cond_prob = p_cond_in_batch, 
+                                                    EPS = EPS)
 
-                    p_joint_for_h = get_sym_joint(cond_prob = p_cond_for_h, 
-                                                EPS = EPS)
+                # Multiscale parametric t-SNE
+                else:
+                    max_entropy = round(log2(batch_size / 2))
+                    mscl_p_joint_in_batch = zeros(batch_size, batch_size).to(device(dev))
+                    
+                    for n_different_entropies, h in enumerate(range(1, max_entropy)):
+                        p_cond_for_h = get_optimized_p_cond(X_high = orig_points_batch.view(-1, input_dimens),
+                                                            target_entropy = h,
+                                                            EPS = EPS,
+                                                            dist_func = dist_func_name,
+                                                            tol = bin_search_tol,
+                                                            max_iter = bin_search_max_iter,
+                                                            min_allowed_sig_sq = min_allowed_sig_sq,
+                                                            max_allowed_sig_sq = max_allowed_sig_sq,
+                                                            dev = dev)
+                        
+                        if p_cond_for_h is None:
+                            continue
 
-                    # TODO This fails if the last batch doesn't match the shape of mscl_p_joint_in_batch
-                    mscl_p_joint_in_batch += p_joint_for_h
+                        p_joint_for_h = get_sym_joint(cond_prob = p_cond_for_h, 
+                                                    EPS = EPS)
 
-                p_joint_in_batch = mscl_p_joint_in_batch / n_different_entropies
+                        # TODO This fails if the last batch doesn't match the shape of mscl_p_joint_in_batch
+                        mscl_p_joint_in_batch += p_joint_for_h
 
-            # Apply early exaggeration to the conditional probability matrix
-            if early_exaggeration:
-                p_joint_in_batch *= early_exaggeration_constant
-                early_exaggeration -= 1
+                    p_joint_in_batch = mscl_p_joint_in_batch / n_different_entropies
+
+                # Apply early exaggeration to the conditional probability matrix
+                if early_exaggeration:
+                    p_joint_in_batch *= early_exaggeration_constant
+                    early_exaggeration -= 1
 
             batches_passed += 1
             
@@ -419,28 +460,39 @@ def train_ptsne(# Data
             # Calculate joint probability matrix in lower-dimensional space for the batch
             X_low, X_reconst_batch = model(orig_points_batch, both = True)
 
-            q_joint_in_batch = get_q_joint(X_low = X_low.view(-1, X_low.shape[1]), 
-                                            dist_func = dist_func_name,
+            assert not torch.isnan(X_low).any(), 'Found nan in low dimsension'
+            assert not torch.isnan(X_reconst_batch).any(), 'Found nan in reconstruction'
+
+            if alpha_KL != 0:
+                q_joint_in_batch = get_q_joint(X_low = X_low.view(-1, X_low.shape[1]), 
+                                                dist_func = dist_func_name,
+                                                EPS = EPS)
+                
+                # Calculate loss
+                loss_KL_ = loss_function_KL(p_joint = p_joint_in_batch, 
+                                            q_joint = q_joint_in_batch,
                                             EPS = EPS)
+            else:
+                loss_KL_ = torch.tensor([0]).to(device(dev))
             
-            # Calculate loss
-            loss_KL_ = loss_function_KL(p_joint = p_joint_in_batch, 
-                                        q_joint = q_joint_in_batch,
-                                        EPS = EPS)
-            
-            loss_MSE_ = loss_function_MSE(X_high = orig_points_batch,
+            loss_L1_ = loss_function_L1(X_high = orig_points_batch,
                                         X_reconst = X_reconst_batch.view(-1, input_dimens))
             
-            loss_pos_ = loss_function_position(X_low = X_low, n_cluster = n_cluster)
+            loss_pos_ = loss_function_position(X_low = X_low, 
+                                               n_cluster = n_cluster, 
+                                               size_gauss = size_gauss,
+                                               dev = dev)
             
             loss = loss_total(loss_KL = loss_KL_,
-                            loss_MSE = loss_MSE_,
+                            loss_L1 = loss_L1_,
                             loss_position = loss_pos_,
-                            alpha_loss = alpha_loss)
+                            alpha_pos = alpha_pos,
+                            alpha_l1 = alpha_l1,
+                            alpha_KL = alpha_KL)
 
 
             train_loss_KL += loss_KL_.item()
-            train_loss_MSE += loss_MSE_.item()
+            train_loss_L1 += loss_L1_.item()
             train_loss_pos += loss_pos_.item()
             train_loss_tot += loss.item()
 
@@ -448,15 +500,12 @@ def train_ptsne(# Data
             loss.backward()
             opt.step()
 
-        epoch_end_time = datetime.datetime.now()
-        time_elapsed = epoch_end_time - epoch_start_time
-
         # Report loss for epoch
         average_loss_KL = train_loss_KL / batches_passed
-        average_loss_MSE = train_loss_MSE / batches_passed
+        average_loss_L1 = train_loss_L1 / batches_passed
         average_loss_pos = train_loss_pos / batches_passed
         average_loss_tot = train_loss_tot / batches_passed
-        epoch_losses.append(np.array([average_loss_KL, average_loss_MSE, average_loss_pos, average_loss_tot]))
+        epoch_losses.append(np.array([average_loss_KL, average_loss_L1, average_loss_pos, average_loss_tot]))
         #print(f'Epoch: {epoch + 1}. Time {time_elapsed}. Average loss: {average_loss_tot:.4f}', flush=True)
 
     #save_path_model = os.path.join(save_dir_path, f"{save_dir_path}/models/{model_name}")
@@ -477,9 +526,12 @@ def train_ptsne(# Data
     #         'batch_size' : batch_size
     #         }
 
-    torch.save(model.state_dict(), f'{save_dir_path}/model {model_name}.pt')
-    np.save(f'{save_dir_path}/loss {model_name}.npy', np.array(epoch_losses))
-    json.dump(params, open(f'{save_dir_path}/config {model_name}.json', "w"))
+    if not isdir(folder_path):
+        makedirs(folder_path, exist_ok=True)        
+
+    torch.save(model.state_dict(), model_path)
+    np.save(loss_path, np.array(epoch_losses))
+    json.dump(params, open(config_path, "w"))
 
     print(f'Model saved as {save_dir_path} -> {model_name}', flush=True)
 
@@ -488,19 +540,20 @@ def plot_results(model,
                 folder_name : str = 'src/Models',
                 model_name : str = None):
 
-    params = json.load(open(f'{folder_name}/config {model_name}.json', 'r'))
+    folder_name = f'{folder_name}/{model_name}'
+    params = json.load(open(f'{folder_name}/config.json', 'r'))
 
-    model.load_state_dict(torch.load(f'{folder_name}/model {model_name}.pt'))
+    model.load_state_dict(torch.load(f'{folder_name}/model.pt'))
     model.eval()
     
-    loss  = np.load(f'{folder_name}/loss {model_name}.npy')
+    loss  = np.load(f'{folder_name}/loss.npy')
 
     with plt.style.context("seaborn-v0_8"):
         
-        plt.plot(loss[:,0], linewidth=1, alpha=0.8, label='KL')
-        plt.plot(loss[:,1], linewidth=1, alpha=0.8, label='MSE')
-        plt.plot(loss[:,2], linewidth=1, alpha=0.8, label='POS')
-        plt.plot(loss[:,3], linewidth=1, alpha=0.8, label='Total')
+        plt.plot(loss[:,0], linewidth=1, alpha=0.8, label='KL', linestyle='--')
+        plt.plot(params['training']['alpha_l1'] * loss[:,1], linewidth=1, alpha=0.8, label='L1', linestyle='-.')
+        plt.plot(params['training']['alpha_pos'] * loss[:,2], linewidth=1, alpha=0.8, label='POS', linestyle=':')
+        plt.plot(loss[:,3], linewidth=1, alpha=0.8, label='Total', linestyle='-')
 
         plt.xlabel('epochs')
         plt.ylabel('Loss')
