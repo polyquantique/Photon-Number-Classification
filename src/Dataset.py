@@ -35,7 +35,8 @@ def dataset_TES(weights,
                 order_dB = False,
                 normalize = False,
                 plot_traces = False,
-                plot_expected = False):
+                plot_expected = False,
+                return_db = False):
 
     init_size = len(weights)
     weights = np.array([0]*(len(Average) - init_size) + weights)
@@ -46,14 +47,27 @@ def dataset_TES(weights,
     
     file_weight_test = [int(weights[dB_.index(i[67:71])] * 1_024) for i in files_test]
     file_weight_train = [int(weights[dB_.index(i[67:71])] * 1_024) for i in files_train]
-
-    X_test = -1*np.concatenate([np.fromfile(f"{path_test}{fileName}",dtype=np.float16) \
-                                    .reshape(-1,signal_size)[:w,interval[0]:interval[1]] \
-                                        for w, fileName in zip(file_weight_test, files_test)]).astype("float")
-    X_train = -1*np.concatenate([np.fromfile(f"{path_train}{fileName}",dtype=np.float16) \
-                                .reshape(-1,signal_size)[:w,interval[0]:interval[1]] \
-                                    for w, fileName in zip(file_weight_train, files_train)]).astype("float")
     
+    X_test = []
+    X_train = []
+    X_dB_test = []
+    X_dB_train = []
+
+    for w, fileName in zip(file_weight_test, files_test):
+        X_test_ = np.fromfile(f"{path_test}{fileName}",dtype=np.float16).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
+        X_test.append(X_test_)
+        X_dB_test.append(np.full(X_test_.shape[0], fileName[67:71]))
+
+    for w, fileName in zip(file_weight_train, files_train):
+        X_train_ = np.fromfile(f"{path_train}{fileName}",dtype=np.float16).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
+        X_train.append(X_train_)
+        X_dB_train.append(np.full(X_train_.shape[0], fileName[67:71]))
+    
+    X_test = -1*np.concatenate(X_test).astype("float")
+    X_train = -1*np.concatenate(X_train).astype("float")
+    X_dB_test = np.concatenate(X_dB_test)
+    X_dB_train = np.concatenate(X_dB_train)
+
     if order_dB:
         
         min_ = X_test.min()
@@ -94,10 +108,15 @@ def dataset_TES(weights,
         #np.random.shuffle(data_train)
         #np.random.shuffle(data_test)
 
-        # Shuffle based on reference index for reproducable results on different hardware
-        random_index = np.load(path_random_index)
-        data_train = data_train[random_index]
-        data_test = data_test[random_index]
+        if path_random_index != None:
+            # Shuffle based on reference index for reproducable results on different hardware
+            random_index = np.load(path_random_index)
+            data_train = data_train[random_index]
+            data_test = data_test[random_index]
+            X_dB_train = X_dB_train[random_index]
+            X_dB_test = X_dB_test[random_index]
+        else:
+            pass
 
     
     expected_prob = np.zeros(n_photon_number)
@@ -134,8 +153,10 @@ def dataset_TES(weights,
             plt.ylabel('Voltage (a.u.)')
             plt.show()
 
-    return data_train, data_test, expected_prob
-
+    if return_db:
+        return data_train, data_test, expected_prob, X_dB_train, X_dB_test
+    else:
+        return data_train, data_test, expected_prob
 
 
 

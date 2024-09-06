@@ -51,13 +51,15 @@ def save_results(gm,
                  name_method : str = 'Max', 
                  path : str = r'src/Results'):
     
-    # if not all(v == 0 for v in gm.confidence_1D):
-    np.save(f'{path}/Confidence/{name_method} 1D.npy', gm.confidence_1D) 
-    # if not all(v == 0 for v in gm.confidence_2D):
-    np.save(f'{path}/Confidence/{name_method} 2D.npy', gm.confidence_2D)
+    if not gm.confidence_1D is None:
+        np.save(f'{path}/Confidence/{name_method}.npy', gm.confidence_1D) 
+    if not gm.confidence_2D is None:
+        np.save(f'{path}/Confidence/{name_method}.npy', gm.confidence_2D)
     np.save(f'{path}/Mean Clusters/{name_method}.npy', gm.cluster_means) 
     np.save(f'{path}/Trustworthiness Cosine/{name_method}.npy', gm.trustworthiness_cos) 
     np.save(f'{path}/Trustworthiness Euclidian/{name_method}.npy', gm.trustworthiness_eucl) 
+    np.save(f'{path}/g2/{name_method}_g2.npy', gm.g2) 
+    np.save(f'{path}/g2/{name_method}_db.npy', gm.unique_db)
 
 
 def get_means(name_method : str = 'Max', 

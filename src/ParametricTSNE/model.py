@@ -12,7 +12,7 @@ def weights_init(m: nn.Module) -> None:
 
 class Network(nn.Module):
 
-    def __init__(self, dim_input, dim_emb=2, layer_size = 300, n_layer = 2):
+    def __init__(self, dim_input, dim_emb=1, layer_size = 300, n_layer = 4):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(dim_input, layer_size)
@@ -43,7 +43,7 @@ class Network(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x, 
-                encode = False, 
+                encode = True, 
                 decode = False,
                 both = False):
         if encode:

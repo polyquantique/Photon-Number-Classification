@@ -1,9 +1,10 @@
 import numpy as np
 import os
+from typing import Union
 import matplotlib.pyplot as plt
 
 from scipy.signal import butter, filtfilt
-from scipy.integrate import simps
+from scipy.integrate import simpson
 
 from .Utils import norm, plot_traces
 
@@ -12,6 +13,7 @@ def sklearn_available(X_train : np.array,
                      X_test : np.array, 
                      path_save : str, 
                      function, 
+                     custom_name : Union[None, str] = None,
                      **param):
     """
 
@@ -32,22 +34,24 @@ def sklearn_available(X_train : np.array,
         Dimensionality reduction method that is executed.
     param : kwargs
         Parameters used in `function`.
-    
 
     Returns
     -------
     X_low : ndarray
         Low-dimensional representation of the samples.
-    
     """
+
     method = function(**param)
-    file_name = f"{function}_{param}"
-    file_name = f"{path_save}/{''.join(file_name.split('.')[3:])}.npy"
-    file_name = file_name.replace('<','')
-    file_name = file_name.replace('>','')
-    file_name = file_name.replace(':','')
-    file_name = file_name.replace(r"'",'')
-    
+    if custom_name is None:
+        file_name = f"{function}_{param}"
+        file_name = f"{path_save}/{''.join(file_name.split('.')[3:])}.npy"
+        file_name = file_name.replace('<', '')
+        file_name = file_name.replace('>', '')
+        file_name = file_name.replace(':', '')
+        file_name = file_name.replace(r"'", '')
+    else:
+        file_name = f"{path_save}/{custom_name}"
+
     if os.path.isfile(file_name):
         X_low = np.load(file_name)
     else:
@@ -57,21 +61,19 @@ def sklearn_available(X_train : np.array,
         else:
             print('Method does not have a transform function')
             X_low = method.fit_transform(X_test)
-        
+
         X_low = norm(X_low)
         np.save(file_name, X_low)
 
     return X_low
 
 
-
-def area(X_high : np.array, 
-         filter : bool = False,
-         cutoff : float = 0.1,
+def area(X_high : np.array,
+         filtering : bool = False,
+         critical_frequency : float = 0.1,
          threshold : float = None,
          plot_filter : bool = False):
     """
-
     Area of signals.
 
     Parameters
@@ -85,32 +87,27 @@ def area(X_high : np.array,
     Returns
     -------
     Area : ndarray
-    
+
     """
 
-    if filter:
-
-        #X_init = signal.savgol_filter(X_init, 20, 2)
-        fs = 1                # Sampling frequency
-        w = cutoff / (fs / 2) # Normalize the frequency
-        b, a = butter(5, w, 'low')
+    if filtering:
+        b, a = butter(5, critical_frequency, 'low')
         X_high = filtfilt(b, a, X_high)
-    
-    if threshold != None:
+
+    if threshold is not None:
         X_high[X_high < threshold] = threshold
-        
+
     if plot_filter:
         plot_traces(X_high)
 
-    X_low = simps(X_high).reshape(-1,1)
+    X_low = simpson(X_high).reshape(-1,1)
 
     return norm(X_low).reshape(-1,1)
 
 
-
-
-def max_value(X_high : np.array, 
-              filter : bool = False):
+def max_value(X_high : np.array,
+              critical_frequency : float = 0.1,
+              filtering : bool = False):
     """
 
     Maximum value of signals.
@@ -122,17 +119,15 @@ def max_value(X_high : np.array,
     Returns
     -------
     norm : ndarray
-    
-    """
-    if filter:
-        #X_init = signal.savgol_filter(X_init, 20, 2)
-        fs = X_high.shape[1]  # Sampling frequency
 
-        fc = 15  # Cut-off frequency of the filter
-        w = fc / (fs / 2) # Normalize the frequency
-        b, a = butter(5, w, 'low')
+    """
+
+    if filter:
+        b, a = butter(5, critical_frequency, 'low')
         X_high = filtfilt(b, a, X_high)
-    
+
     return norm(X_high.max(axis = 1)).reshape(-1,1)
+
+
 
 

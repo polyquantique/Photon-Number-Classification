@@ -31,21 +31,20 @@ def get_optimized_p_cond(X_high: tensor,
                         dev : str = 'cpu') -> Optional[tensor]:
     """
     Calculate conditional probability matrix optimized by binary search.
-    
 
     Parameters
     ----------
-    X_high : tensor 
+    X_high : tensor
         High dimensional data (initial samples).
     target_entropy : float
         Target entropy to define sigma_i associated to evey sample.
     dist_func : str
         Name of the distance metric used in distance evaluation. 
     tol : float
-        Tolerance used in definition of sigma_i^2. 
+        Tolerance used in definition of sigma_i^2.
         Iterations stop when the difference between the expected entropy and the computed entropy is less than `tol`.
     max_iter : int
-        Maximum number of iteration to find sigma_i^2. 
+        Maximum number of iteration to find sigma_i^2.
     min_allowed_sig_sq : float
         Minimum value of sigma_i^2 evaluated.
     max_allowed_sig_sq : float
@@ -59,7 +58,7 @@ def get_optimized_p_cond(X_high: tensor,
     p_cond : tensor
         Conditional probability matrix.
     """
-    
+
     n_points = X_high.size(0)
 
     # Calculating distance matrix with the given distance function
@@ -73,8 +72,8 @@ def get_optimized_p_cond(X_high: tensor,
     sq_sigmas = (min_sigma_sq + max_sigma_sq) / 2
 
     # Computing conditional probability matrix from distance matrix
-    p_cond = get_p_cond(distances = distances, 
-                        sigmas_sq = sq_sigmas, 
+    p_cond = get_p_cond(distances = distances,
+                        sigmas_sq = sq_sigmas,
                         mask = diag_mask,
                         EPS = EPS)
 
@@ -90,7 +89,7 @@ def get_optimized_p_cond(X_high: tensor,
         if curr_iter >= max_iter:
             print("Warning! Exceeded max_iter.", flush=True)
             return p_cond
-        
+
         pos_diff = (ent_diff > 0).float()
         neg_diff = (ent_diff <= 0).float()
 
@@ -98,8 +97,8 @@ def get_optimized_p_cond(X_high: tensor,
         min_sigma_sq = pos_diff * min_sigma_sq + neg_diff * sq_sigmas
 
         sq_sigmas = finished.logical_not() * (min_sigma_sq + max_sigma_sq) / 2 + finished * sq_sigmas
-        p_cond = get_p_cond(distances = distances, 
-                            sigmas_sq = sq_sigmas, 
+        p_cond = get_p_cond(distances = distances,
+                            sigmas_sq = sq_sigmas,
                             mask = diag_mask,
                             EPS = EPS)
         ent_diff = entropy(p_cond) - target_entropy
@@ -109,7 +108,7 @@ def get_optimized_p_cond(X_high: tensor,
     if isnan(ent_diff.max()):
         print("Warning! Entropy is nan. Discarding batch", flush=True)
         return
-    
+
     return p_cond
 
 
@@ -122,7 +121,7 @@ def get_p_cond(distances : tensor,
 
     Parameters
     ----------
-    distances : tensor 
+    distances : tensor
         Matrix of squared distances ||x_i - x_j||^2
     sigmas_sq : tensor
         Row vector of squared sigma for each row in distances
@@ -171,7 +170,7 @@ def get_q_joint(X_low: tensor,
     return torch_max(q_joint, EPS)
 
 
-def get_sym_joint(cond_prob: tensor, 
+def get_sym_joint(cond_prob: tensor,
                   EPS : Tensor) -> tensor:
     """
     Make a joint probability distribution out of conditional distribution based on symmetric SNE.
@@ -185,7 +184,7 @@ def get_sym_joint(cond_prob: tensor,
     Returns
     -------
     Joint distribution matrix : tensor
-        Joint probability matrix. All values in it sum up to 1.    
+        Joint probability matrix. All values in it sum up to 1.
     """
     n_points = cond_prob.size(0)
     distr_joint = (cond_prob + cond_prob.t()) / (2 * n_points)
@@ -216,7 +215,7 @@ def loss_function_KL(p_joint : Tensor,
 def loss_function_L1(X_high : Tensor,
                     X_reconst : Tensor):
     loss = nn.L1Loss()
-    return loss(X_high, X_reconst) 
+    return loss(X_high, X_reconst)
 
 
 def loss_function_position(X_low : Tensor,
@@ -237,26 +236,10 @@ def loss_function_position(X_low : Tensor,
     #X_test = torch.linspace(-2,2,10_000).view(-1,1)
     desired_dist = torch.logsumexp(- 0.5 * ((X_low - means) / std) ** 2, dim=1) #
     #desired_dist = torch.from_numpy(1 + signal.square(2 * np.pi * n_cluster * X_low.detach().numpy()))**2
-    loss = torch.mean(torch.abs(desired_dist))#desired_dist.max() - 
+    loss = torch.mean(torch.abs(desired_dist))
 
+    return loss
 
-    # with plt.style.context("seaborn-v0_8"):
-        
-    #     plt.scatter(X_low.cpu().detach().numpy().flatten(), desired_dist.cpu().detach().numpy().flatten(), alpha=0.8, s=1)
-    #     plt.show()
-    #
-        
-    
-    return loss  
-
-
-def loss_area(X_low : Tensor,
-              X_high : Tensor):
-    
-    return None
-
-
-    
 
 def loss_total(loss_KL,
             loss_L1,
@@ -266,8 +249,6 @@ def loss_total(loss_KL,
             alpha_KL : float = 1):
 
     return alpha_l1 * loss_L1 +  alpha_pos * loss_position + alpha_KL * loss_KL 
-
-    
 
 
 def train_ptsne(# Data
@@ -357,7 +338,7 @@ def train_ptsne(# Data
     model_path = f'{folder_path}/model.pt'
     loss_path = f'{folder_path}/loss.npy'
     config_path = f'{folder_path}/config.json'
-    
+
     if isdir(folder_path):
         model.load_state_dict(torch.load(model_path))
         epoch_losses = list(np.load(loss_path))
@@ -375,7 +356,7 @@ def train_ptsne(# Data
         model_name = model_name
     else:
         model_name = get_random_string(6)
-    
+
     train_dl = torch.from_numpy(X_high).view(n_samples, input_dimens).float()
     train_dl = (train_dl - train_dl.min()) / (train_dl.max() - train_dl.min())
 
@@ -396,7 +377,7 @@ def train_ptsne(# Data
 
             #orig_points_batch, _ = list_with_batch
             orig_points_batch = train_dl[batch_index].to(torch.device(dev))
-            
+
             # Calculate conditional probability matrix in higher-dimensional space for the batch
 
             # Regular parametric t-SNE
@@ -422,7 +403,7 @@ def train_ptsne(# Data
                 else:
                     max_entropy = round(log2(batch_size / 2))
                     mscl_p_joint_in_batch = zeros(batch_size, batch_size).to(device(dev))
-                    
+
                     for n_different_entropies, h in enumerate(range(1, max_entropy)):
                         p_cond_for_h = get_optimized_p_cond(X_high = orig_points_batch.view(-1, input_dimens),
                                                             target_entropy = h,
@@ -433,7 +414,7 @@ def train_ptsne(# Data
                                                             min_allowed_sig_sq = min_allowed_sig_sq,
                                                             max_allowed_sig_sq = max_allowed_sig_sq,
                                                             dev = dev)
-                        
+
                         if p_cond_for_h is None:
                             continue
 
@@ -451,9 +432,6 @@ def train_ptsne(# Data
                     early_exaggeration -= 1
 
             batches_passed += 1
-            
-
-            #for index, sample in enumerate(orig_points_batch):
 
             opt.zero_grad()
 
@@ -467,22 +445,22 @@ def train_ptsne(# Data
                 q_joint_in_batch = get_q_joint(X_low = X_low.view(-1, X_low.shape[1]), 
                                                 dist_func = dist_func_name,
                                                 EPS = EPS)
-                
+
                 # Calculate loss
                 loss_KL_ = loss_function_KL(p_joint = p_joint_in_batch, 
                                             q_joint = q_joint_in_batch,
                                             EPS = EPS)
             else:
                 loss_KL_ = torch.tensor([0]).to(device(dev))
-            
+
             loss_L1_ = loss_function_L1(X_high = orig_points_batch,
                                         X_reconst = X_reconst_batch.view(-1, input_dimens))
-            
+
             loss_pos_ = loss_function_position(X_low = X_low, 
                                                n_cluster = n_cluster, 
                                                size_gauss = size_gauss,
                                                dev = dev)
-            
+
             loss = loss_total(loss_KL = loss_KL_,
                             loss_L1 = loss_L1_,
                             loss_position = loss_pos_,
@@ -565,5 +543,17 @@ def plot_results(model,
         print (x)
         for y in params[x]:
             print ('  ', y,':',params[x][y])
+
+
+def load_model(model, path_config : str = 'src/ParametricTSNE/model 1D'):
+
+    params = json.load(open(f'{path_config}/config.json', 'r'))
+    model = model(**params['network'])
+    model.load_state_dict(torch.load(f'{path_config}/model.pt'))
+    model.eval()
+
+    return model
+
+
 
 
