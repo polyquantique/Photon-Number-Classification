@@ -1,7 +1,7 @@
 
 # PHOTON NUMBER CLASSIFICATION
 
-Comparison of different algorithms for classification of transition edge sensor signals for photon number state detection.
+Comparison of different algorithms for the classification of transition edge sensor signals.
 With the development of a variety of techniques in the field of A.I. the goal is to quantify the advantages of modern classification techniques 
 in the context of photon detection. 
 
@@ -9,7 +9,7 @@ in the context of photon detection.
 
 The different algorithms are compared in a single notebook available in :
 
-`src/Metrics.ipynb`
+`uniform_TES.ipynb`
 
 The following methods are evaluated :
 
@@ -20,29 +20,13 @@ The following methods are evaluated :
 - t-Distributed Stochastic Neighbor Embedding (t-SNE)
 - Non-Negative Matrix Factorization (NMF)
 - Isomap
-- Autoencoder
-
-
-## AUTOENCODER
-
-The different algorithms are compared in a single notebook available in :
-
-`src/AutoencoderAPI.ipynb`
-
-An autoencoder is a type of neural network trained to reproduce the signal it receives as input. Half the network (encoder) can be used to asign an arbitrary number of parameters to an input signal. This way, the encoder acts as a dimensionality reduction process.
-
-<p align="center">
-    <img src="doc/Assets README/BowTie to HalfTie.png"/>
-</p>
-
-Neural networks allow for a wide variety of architectures and therefore their evaluation is less straighforward. The `AutoencoderAPI` was designed to explore a variety of algorithms and create a framework to compare their performance.
+- Parametric t-SNE
+- Parametric UMAP
 
 
 ## TODO
 
-- Pytorch dataset classs structure for batching and true random.
-- Test GPU functionalities of pytorch
-- Modify Log structure to reduce the storing and change it to computing when loading results.
+- Include Sphinx documentation
 
 ## ACKNOWLEDGMENTS
 
