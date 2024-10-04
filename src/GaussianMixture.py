@@ -497,14 +497,12 @@ class gaussian_mixture():
 
         multi_gaussian = np.zeros((self.number_cluster, x.size))
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                               self.cluster_covariances,
-                                                               self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
             if axis is not None:
                 mean = mean[axis]
                 covariance = covariance[axis,axis]
 
-            multi_gaussian[index,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(x)
+            multi_gaussian[index,:] = multivariate_normal(mean = mean, cov = covariance).pdf(x)
 
         return multi_gaussian
 
@@ -529,15 +527,12 @@ class gaussian_mixture():
         """
         multi_uniform = np.zeros((self.number_cluster, x.size))
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                               self.cluster_covariances,
-                                                               self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
             if axis is not None:
                 mean = mean[axis]
                 covariance = covariance[axis,axis]
 
-            multi_uniform[index] = weight * \
-                uniform(loc = mean - np.sqrt(3 * covariance), scale = 2 * np.sqrt(3 * covariance)).pdf(x)
+            multi_uniform[index] = uniform(loc = mean - np.sqrt(3 * covariance), scale = 2 * np.sqrt(3 * covariance)).pdf(x)
 
         return multi_uniform
 
@@ -562,15 +557,13 @@ class gaussian_mixture():
 
         multi_gen_gauss = np.zeros((self.number_cluster, x.size))
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                               self.cluster_covariances,
-                                                               self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
             if axis is not None:
                 mean = mean[axis]
                 covariance = covariance[axis,axis]
 
             alpha = np.sqrt(covariance * gamma(1/beta) / gamma(3/beta))
-            multi_gen_gauss[index,:] = weight * gennorm(beta = beta,loc = mean, scale = alpha).pdf(x)
+            multi_gen_gauss[index,:] = gennorm(beta = beta,loc = mean, scale = alpha).pdf(x)
 
         return multi_gen_gauss
 
@@ -598,10 +591,8 @@ class gaussian_mixture():
         x, y = np.meshgrid(x, y)
         pos = np.dstack((x, y))
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                               self.cluster_covariances,
-                                                               self.cluster_weights)):
-            multi_gaussian[index,:,:] = weight * multivariate_normal(mean = mean, cov = covariance).pdf(pos)
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances, self.cluster_weights)):
+            multi_gaussian[index,:,:] = multivariate_normal(mean = mean, cov = covariance).pdf(pos)
 
         return multi_gaussian
 
@@ -708,7 +699,7 @@ class gaussian_mixture():
                     plt.plot(x, conf_integral)
                     plt.show()
 
-            self.confidence_1D[index] = trapezoid(x = x, y = conf_integral) / weight
+            self.confidence_1D[index] = trapezoid(x = x, y = conf_integral)
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
@@ -785,7 +776,7 @@ class gaussian_mixture():
                     plt.colorbar()
                     plt.show()
 
-            self.confidence_2D[index] = self.trapezoid_2d(x, y, conf_integral) / weight
+            self.confidence_2D[index] = self.trapezoid_2d(x, y, conf_integral)
 
 
         with plt.style.context(self.style_name):

@@ -5,17 +5,35 @@ from torch.utils.data import DataLoader
 from torch.nn.functional import mse_loss
 import torch.nn.functional as F
 
-from umap_pytorch.data import UMAPDataset, MatchDataset
-from umap_pytorch.modules import get_umap_graph, umap_loss
-from umap_pytorch.model import default_encoder, default_decoder
+from .data import UMAPDataset, MatchDataset
+from .modules import get_umap_graph, umap_loss
+from .model import default_encoder, default_decoder
 
-from umap.umap_ import find_ab_params
 import dill
+import numpy as np
+from scipy.optimize import curve_fit
 from umap import UMAP
 
 """
 From https://github.com/elyxlz/umap_pytorch/tree/main
 """
+
+def find_ab_params(spread, min_dist):
+    """Fit a, b params for the differentiable curve used in lower
+    dimensional fuzzy simplicial complex construction. We want the
+    smooth curve (from a pre-defined family with simple gradient) that
+    best matches an offset exponential decay.
+    """
+
+    def curve(x, a, b):
+        return 1.0 / (1.0 + a * x ** (2 * b))
+
+    xv = np.linspace(0, spread * 3, 300)
+    yv = np.zeros(xv.shape)
+    yv[xv < min_dist] = 1.0
+    yv[xv >= min_dist] = np.exp(-(xv[xv >= min_dist] - min_dist) / spread)
+    params, covar = curve_fit(curve, xv, yv)
+    return params[0], params[1]
 
 """ Model """
 
@@ -49,7 +67,7 @@ class Model(pl.LightningModule):
             embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
             encoder_loss = umap_loss(embedding_to, embedding_from, self._a, self._b, edges_to_exp.shape[0], negative_sample_rate=5)
             self.log("umap_loss", encoder_loss, prog_bar=True)
-            
+
             if self.decoder:
                 recon = self.decoder(embedding_to)
                 recon_loss = self.reconstruction_loss(recon, edges_to_exp)
@@ -57,7 +75,7 @@ class Model(pl.LightningModule):
                 return encoder_loss + self.beta * recon_loss
             else:
                 return encoder_loss
-            
+
         else:
             data, embedding = batch
             embedding_parametric = self.encoder(data)
@@ -70,7 +88,7 @@ class Model(pl.LightningModule):
                 return encoder_loss + self.beta * recon_loss
             else:
                 return encoder_loss
-            
+
 
 """ Datamodule """
 
@@ -79,7 +97,7 @@ class Datamodule(pl.LightningDataModule):
     def __init__(
         self,
         dataset,
-        batch_size,        
+        batch_size,
         num_workers,
     ):
         super().__init__()
