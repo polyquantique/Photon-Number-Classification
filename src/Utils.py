@@ -1,8 +1,10 @@
+from matplotlib import pyplot as plt
+import matplotlib as mpl
+from adjustText import adjust_text
 import numpy as np
-import pickle
-import matplotlib.pyplot as plt
+import os
 
-from .GaussianMixture import gaussian_mixture
+STYLE = "seaborn-v0_8"
 
 
 def plot_traces(X_high : np.array):
@@ -19,13 +21,11 @@ def plot_traces(X_high : np.array):
     None
     
     """
-    with plt.style.context("seaborn-v0_8"):
-        plt.figure(figsize=(10,4), dpi=100)
-        [plt.plot(x, alpha = 0.01) for x in X_high[::10]]
+    with plt.style.context(STYLE):
+        plt.figure(figsize=(6,3), dpi=100)
+        plt.plot(X_high[::10].T, alpha = 0.01)
         plt.xlabel('Time (a.u.)')
         plt.ylabel('Voltage (a.u.)')
-        #plt.xticks([])
-        #plt.yticks([])
         plt.show()
 
 
@@ -44,22 +44,35 @@ def norm(X : np.array):
     
     """
     return (X - X.min()) / (X.max() - X.min())
-    #return (X - X.mean()) / (X.std())
 
 
 def save_results(gm, 
                  name_method : str = 'Max', 
                  path : str = r'src/Results'):
     
+    if not os.path.isdir(path):
+        try:
+            os.mkdir(f'{path}/Confidence')
+            os.mkdir(f'{path}/Mean Clusters')
+            os.mkdir(f'{path}/Trustworthiness Euclidian')
+            os.mkdir(f'{path}/g2')
+        except OSError as error:
+            print(error)
+    
     if not gm.confidence_1D is None:
         np.save(f'{path}/Confidence/{name_method}.npy', gm.confidence_1D) 
     if not gm.confidence_2D is None:
         np.save(f'{path}/Confidence/{name_method}.npy', gm.confidence_2D)
-    np.save(f'{path}/Mean Clusters/{name_method}.npy', gm.cluster_means) 
-    np.save(f'{path}/Trustworthiness Cosine/{name_method}.npy', gm.trustworthiness_cos) 
-    np.save(f'{path}/Trustworthiness Euclidian/{name_method}.npy', gm.trustworthiness_eucl) 
-    np.save(f'{path}/g2/{name_method}_g2.npy', gm.g2) 
-    np.save(f'{path}/g2/{name_method}_db.npy', gm.unique_db)
+
+    if not gm.cluster_means is None:
+        np.save(f'{path}/Mean Clusters/{name_method}.npy', gm.cluster_means) 
+
+    if not gm.trustworthiness_eucl is None:
+        np.save(f'{path}/Trustworthiness Euclidian/{name_method}.npy', gm.trustworthiness_eucl) 
+    
+    if not gm.g2 is None:
+        np.save(f'{path}/g2/{name_method}_g2.npy', gm.g2) 
+        np.save(f'{path}/g2/{name_method}_db.npy', gm.unique_db)
 
 
 def get_means(name_method : str = 'Max', 
@@ -71,64 +84,53 @@ def get_means(name_method : str = 'Max',
     return means
 
 
-def open_object(file_name):
-    """
-    Open a file using the pickle library. 
 
-    Parameters
-    ----------
-    file_name : str
-        Name of the file to open and read.
+def plot_results(config,
+                 pad = 0.5,
+                 xlim = (0,30),
+                 ylim = (0.7,1.01),
+                 yscale = 'linear',
+                 path_results = r'src/Results TES (Uniform)/'):
 
-    Returns
-    -------
-    None
-    
-    """
-    try:
-        with open(file_name, 'rb') as f:
-            object_ = pickle.load(f)
-    except Exception as ex:
-        print("Error when loading file : ", ex)
+    texts = []
+    objects = []
+    cmap = mpl.colormaps['tab20b']
+    colors = cmap(np.linspace(0, 1, len(config.keys())))
 
-    return object_
+    with plt.style.context(STYLE):
+        fig, ax = plt.subplots(figsize = (6,3))
+        for method, color in zip(config, colors):
 
+            method_dict = config[method]
+            i, f = method_dict['n_photons']
+            result = np.load(f'{path_results}/Confidence/{method}', allow_pickle=True)
+            confidence = result[:f]
+            photon_number = np.arange(i,f+i)
 
-def load_mean_std(path):
+            objects.append(ax.plot(photon_number, confidence, 
+                                    c = color, 
+                                    alpha=1, 
+                                    linewidth = 1,
+                                    linestyle = method_dict['line']))
 
-    path = f"{path}"
-    config = open_object(f"{path}/log.bin")
-
-    return config['internal']['mean'], config['internal']['std']
-
-
-def plot_poisson_confidence(average_list : list,
-                            n_cluster_list : list,
-                            X_low : list,
-                            X_high : list,
-                            confidence_dimension : int = 1):
-
-    confidence_poisson = []
-
-    for index, average in enumerate(average_list):
-
-        gm = gaussian_mixture(X_low[index], 
-                            X_high[index],
-                            number_cluster = n_cluster_list[index],
-                            cluster_iter = 20,
-                            info_sweep = 10,
-                            plot_sweep = True,
-                            dpi = 100)
-
-        gm.plot_density(bw_adjust = 0.1)
-        gm.plot_cluster(plot_kde = True)
-                
-        if confidence_dimension == 2:
-            gm.plot_confidence_2d(average_poisson = average)
-            confidence_poisson.append(gm.confidence_2D)
-        else:
-            gm.plot_confidence_1d(axis = 0, average_poisson = average) 
-            confidence_poisson.append(gm.confidence_1D)
-
-    return confidence_poisson
+            texts.append(ax.text(photon_number[-1]+pad, 
+                                    confidence[-1], 
+                                    method_dict['Name'], 
+                                    color = color, 
+                                    fontsize=10, 
+                                    weight="bold", 
+                                    va = "center"))
+            
+        adjust_text(texts = texts,
+                    ax = ax, 
+                    expand=(1.05, 1.2),
+                    only_move = {"text": "xy", "static": "xy", "explode": "xy", "pull": "xy"},
+                    ensure_inside_axes = False) 
+        plt.ylabel('Confidence')
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.yscale(yscale)
+        plt.xlabel('Photon number')
+        plt.savefig(f'{path_results}Confidence.pdf', format='pdf', bbox_inches='tight')
+        plt.show()
 

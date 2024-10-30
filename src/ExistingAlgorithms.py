@@ -1,7 +1,6 @@
 import numpy as np
 import os
 from typing import Union
-import matplotlib.pyplot as plt
 
 from scipy.signal import butter, filtfilt
 from scipy.integrate import simpson
@@ -122,7 +121,7 @@ def max_value(X_high : np.array,
 
     """
 
-    if filter:
+    if filtering:
         b, a = butter(5, critical_frequency, 'low')
         X_high = filtfilt(b, a, X_high)
 
