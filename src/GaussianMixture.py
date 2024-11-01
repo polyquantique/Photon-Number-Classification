@@ -86,10 +86,11 @@ class gaussian_mixture():
                  width_plot : int = 6,
                  height_plot : int = 3,
                  dpi : int = 100,
+                 style : str = r'src/custom.mplstyle',
                  latex : bool = False) -> None:
 
         # Style
-        self.style_name = r'src/custom.mplstyle'#"seaborn-v0_8"  # str
+        self.style_name = style#"seaborn-v0_8"  # str
         self.cmap = 'Blues'  # str
         self.text_color = 'k'  # str
         self.levels = 30  # int
@@ -159,8 +160,10 @@ class gaussian_mixture():
         self.confidence_poisson = None
 
         # Trustworthiness
-        self.trustworthiness_eucl = np.zeros(self.number_cluster)
-        self.trustworthiness_cos = np.zeros(self.number_cluster)
+        self.trustworthiness_eucl = np.zeros(3)
+
+        # g2
+        self.g2 = None
 
     def clustering_iter(self, info_sweep : int = 10,
                             cluster_iter : int = 10,
@@ -371,17 +374,17 @@ class gaussian_mixture():
         """
 
         def plot_functions_1d(x, func):
-            for index in range(self.number_cluster):
+            for index, weight in zip(range(self.number_cluster), self.cluster_weights):
                 plt.plot(x,
-                         func[index],
+                         weight * func[index],
                          linewidth = 1,
                          label = f"{index + self.label_shift}")
 
         def plot_functions_2d(x, func):
-            for index in range(self.number_cluster):
+            for index, weight in zip(range(self.number_cluster), self.cluster_weights):
                 plt.contour(x,
                             x,
-                            func[index],
+                            weight * func[index],
                             alpha = 0.5,
                             levels = [func[index].max()/2],
                             linewidths = 0.5,
@@ -408,11 +411,18 @@ class gaussian_mixture():
 
                 if cluster_number:
                     for index, mean in enumerate(self.cluster_means[:-1]):
-                        if index % 2 != 0:
-                            plt.text(mean, y_gauss[index,index]+1, index, color = self.text_color, size=10)
+                        plt.text(mean, 
+                                self.cluster_weights[index]*y_gauss[index,index]+1, 
+                                index, 
+                                color = self.text_color, 
+                                size=10)
     
                     last = self.cluster_means.shape[0]-1
-                    plt.text(self.cluster_means[-1], y_gauss[last,last]+0.5, f'{last}+', color = self.text_color, size=10)
+                    plt.text(self.cluster_means[-1], 
+                            self.cluster_weights[index]*y_gauss[last,last]+1, 
+                            f'{last}+', 
+                            color = self.text_color, 
+                            size=10)
 
                 if plot_scale == 'log':
                     ylim = (self.min_log, 1e2)
@@ -432,26 +442,26 @@ class gaussian_mixture():
                 if plot_gaussians: plot_functions_2d(x, self.multi_gaussian_2d(x, x))
 
                 sns.kdeplot(x = self.X_low[:,0],
-                            y = self.X_low[:,1],
-                            cmap = self.cmap,
-                            cbar=True,
-                            fill = True,
-                            norm = LogNorm(),
-                            bw_adjust = bw_adjust,
-                            thresh = self.min_log,
-                            levels = self.levels,
-                            cbar_kws={"ticks":[0,1,10,20,30,40,50,100,1000],
-                                      "label":"Density"},
-                            gridsize = self.gridsize_density)
+                           y = self.X_low[:,1],
+                           cmap = self.cmap,
+                           cbar=True,
+                           fill = True,
+                           norm = LogNorm(),
+                           bw_adjust = bw_adjust,
+                           thresh = self.min_log,
+                           levels = self.levels,
+                           cbar_kws={"ticks":[0,1,10,20,30,40,50,100,1000],
+                                     "label":"Density"},
+                           gridsize = self.gridsize_density)
 
                 if cluster_number:
                     for index, mean in enumerate(self.cluster_means[:-1]):
-                        if index % 2 != 0:
-                            plt.text(mean[0]+0.03, mean[1]+1, index, color = self.text_color, size=10)
+                        # if index % 2 != 0:
+                        plt.text(mean[0], mean[1]+0.03, index, color = self.text_color, size=10)
     
                     last = self.cluster_means.shape[0]-1
                     mean = self.cluster_means[-1]
-                    plt.text(mean[0]+0.03, mean[1], f'{last}+', color = self.text_color, size=10)
+                    plt.text(mean[0], mean[1]+0.03, f'{last}+', color = self.text_color, size=10)
 
                 plt.xlabel(r'$s_1$')
                 plt.ylabel(r'$s_2$')
@@ -470,7 +480,7 @@ class gaussian_mixture():
                 file_name = f'{save_path}/density.pdf'
 
             if save_path is not None:
-                plt.savefig(file_name, format='pdf', bbox_inches='tight')
+                plt.savefig(file_name, bbox_inches='tight', pad_inches = 0)
                 plt.show()
             else:
                 plt.show()
@@ -591,7 +601,7 @@ class gaussian_mixture():
         x, y = np.meshgrid(x, y)
         pos = np.dstack((x, y))
 
-        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances, self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
             multi_gaussian[index,:,:] = multivariate_normal(mean = mean, cov = covariance).pdf(pos)
 
         return multi_gaussian
@@ -631,7 +641,7 @@ class gaussian_mixture():
 
         1D Confidence metric following :
 
-        P. C. Humphreys et al., ‘Tomography of photon-number resolving continuous-output detectors’, 
+        P. C. Humphreys et al., 'Tomography of photon-number resolving continuous-output detectors', 
         New J. Phys., vol. 17, no. 10, p. 103044, Oct. 2015, doi: 10.1088/1367-2630/17/10/103044.
 
         Parameters
@@ -661,9 +671,7 @@ class gaussian_mixture():
         """
         self.confidence_1D = np.zeros(self.number_cluster)
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                        self.cluster_covariances,
-                                                        self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
 
             if self.dim > 1:
                 x = np.linspace(mean[axis] - size_zone*covariance[axis,axis],
@@ -702,7 +710,7 @@ class gaussian_mixture():
             self.confidence_1D[index] = trapezoid(x = x, y = conf_integral)
 
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
+            plt.figure(figsize=(self.width_plot,3), dpi=self.dpi)
             plt.plot(self.unique_labels[:-1], self.confidence_1D[:-1])
             plt.title(f"1D confidence over axis {axis}")
             plt.xlabel("Photon number")
@@ -744,9 +752,7 @@ class gaussian_mixture():
         """
         self.confidence_2D = np.zeros(self.number_cluster)
 
-        for index, (mean, covariance, weight) in enumerate(zip(self.cluster_means,
-                                                        self.cluster_covariances,
-                                                        self.cluster_weights)):
+        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
 
             x = np.linspace(mean[0] - size_zone*covariance[0,0],
                             mean[0] + size_zone*covariance[0,0],
@@ -780,7 +786,7 @@ class gaussian_mixture():
 
 
         with plt.style.context(self.style_name):
-            plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
+            plt.figure(figsize=(self.width_plot,3), dpi=self.dpi)
             plt.plot(self.unique_labels[:-1], self.confidence_2D[:-1])
             plt.title(f"2D confidence")
             plt.xlabel("Photon number")
@@ -813,9 +819,7 @@ class gaussian_mixture():
         None
 
         """
-        #for index, label in enumerate(self.unique_labels):
         label = self.unique_labels[-1]
-        index = -1
 
         X_low = self.X_low[self.labels <= label]
         X_high = self.X_high[self.labels <= label]
@@ -823,12 +827,10 @@ class gaussian_mixture():
         self.trustworthiness_eucl[-3] = trustworthiness(X_high, X_low, metric="euclidean", n_neighbors=15)
         self.trustworthiness_eucl[-2] = trustworthiness(X_high, X_low, metric="euclidean", n_neighbors=500)
         self.trustworthiness_eucl[-1] = trustworthiness(X_high, X_low, metric="euclidean", n_neighbors=10_000)
-        #self.trustworthiness_cos[index] = trustworthiness(X_high, X_low, metric="cosine")
 
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
-            plt.plot(self.unique_labels, self.trustworthiness_eucl, label='Euclidean')
-            plt.plot(self.unique_labels, self.trustworthiness_eucl, label='Cosine')
+            plt.plot(['15', '500', '10 000'], self.trustworthiness_eucl, label='Euclidean')
             plt.xlabel("Photon number")
             plt.ylabel("Trustworthiness")
             plt.legend()
@@ -856,7 +858,7 @@ class gaussian_mixture():
                 cluster = self.X_high[self.labels == label]
                 c = next(color)
                 if len(cluster) > 1000: cluster = cluster[:1000]
-                [plt.plot(i, alpha=0.05, c=c) for i in cluster] 
+                plt.plot(cluster.T, alpha=0.05, c=c)
 
             plt.xlabel("Time (a.u.)")
             plt.ylabel("Voltage (a.u.)")
@@ -878,13 +880,11 @@ class gaussian_mixture():
         None
 
         """
-        #color = iter(cm.Accent(np.linspace(0, 1, self.number_cluster)))
         with plt.style.context(self.style_name):
             plt.figure(figsize=(self.width_plot,self.height_plot), dpi=self.dpi)
             for label in self.unique_labels:
                 cluster = self.X_high[self.labels == label]
-                #c = next(color)
-                plt.plot(np.mean(cluster, axis=0), label=label)#, c=c) #
+                plt.plot(np.mean(cluster, axis=0), label=label)
 
             plt.legend(ncol=3)
             plt.xlabel("Time (a.u.)")

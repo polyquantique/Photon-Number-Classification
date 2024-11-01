@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+from matplotlib import ticker
 from adjustText import adjust_text
 import numpy as np
 import os
@@ -134,3 +135,41 @@ def plot_results(config,
         plt.savefig(f'{path_results}Confidence.pdf', format='pdf', bbox_inches='tight')
         plt.show()
 
+
+
+
+def plot_trust(config,
+               path_results = r'src/Results TES (Uniform)/'):
+
+    trust1 = []
+    trust2 = []
+    trust3 = []
+    name_method = []
+
+    for index_method, method in enumerate(config):
+
+            method_dict = config[method]
+            result = np.load(f'{path_results}/Trustworthiness Euclidian/{method}')
+            print(method)
+            trust1.append(result[-1])
+            trust2.append(result[-2])
+            trust3.append(result[-3])
+            name_method.append(method_dict['Name'])
+
+    y_pos = np.arange(4*len(trust1))
+
+    with plt.style.context("seaborn-v0_8"):
+        plt.figure(figsize = (6,10))
+        ax = plt.gca()
+        hbars1 = ax.barh(y_pos[0::4], trust1, align='center', alpha=0.7)
+        hbars2 = ax.barh(y_pos[1::4], trust2, align='center', alpha=0.7)
+        hbars3 = ax.barh(y_pos[2::4], trust3, align='center', alpha=0.7)
+        ax.set_yticks(y_pos[1::4], labels=name_method)
+        ax.bar_label(hbars1, fmt='%.3f', padding=3)
+        ax.bar_label(hbars2, fmt='%.3f', padding=3)
+        ax.bar_label(hbars3, fmt='%.3f', padding=3)
+        ax.xaxis.set_minor_formatter(ticker.ScalarFormatter())
+        ax.set_xlabel('Trustworthiness Euclidean')
+        ax.set_xlim(0.89,1.01)
+        plt.savefig(f'{path_results}Trustworthiness.pdf', format='pdf', bbox_inches='tight')
+        plt.show()

@@ -43,7 +43,7 @@ class Network(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x, 
-                encode = True, 
+                encode = False, 
                 decode = False,
                 both = False):
         if encode:
@@ -54,6 +54,7 @@ class Network(nn.Module):
             return encoder_, decoder_
         elif decode:
             return self.decoder(x)
+
 
 
 def size_conv(L_in,

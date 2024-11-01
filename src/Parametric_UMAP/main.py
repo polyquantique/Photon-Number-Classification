@@ -9,7 +9,7 @@ from .data import UMAPDataset, MatchDataset
 from .modules import get_umap_graph, umap_loss
 from .model import default_encoder, default_decoder
 
-import dill
+import json
 import numpy as np
 from scipy.optimize import curve_fit
 from umap import UMAP
@@ -50,6 +50,7 @@ class Model(pl.LightningModule):
         match_nonparametric_umap=False,
     ):
         super().__init__()
+        self.save_hyperparameters()
         self.lr = lr
         self.encoder = encoder
         self.decoder = decoder
@@ -62,6 +63,7 @@ class Model(pl.LightningModule):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
 
     def training_step(self, batch, batch_idx):
+
         if not self.match_nonparametric_umap:
             (edges_to_exp, edges_from_exp) = batch
             embedding_to, embedding_from = self.encoder(edges_to_exp), self.encoder(edges_from_exp)
@@ -138,6 +140,7 @@ class PUMAP():
         self.min_dist = min_dist
         self.metric = metric
         self.n_components = n_components
+        self.dim_input = None
         self.beta = beta
         self.reconstruction_loss = reconstruction_loss
         self.random_state = random_state
@@ -149,31 +152,75 @@ class PUMAP():
         self.match_nonparametric_umap = match_nonparametric_umap
         
     def fit(self, X):
-        trainer = pl.Trainer(accelerator='gpu', devices=1, max_epochs=self.epochs)
-        encoder = default_encoder(X.shape[1:], self.n_components) if self.encoder is None else self.encoder
+
+        
+
+        trainer = pl.Trainer(
+            accelerator='gpu', 
+            devices=1, 
+            max_epochs=self.epochs
+            )
+        
+        self.dim_input = X.shape[1]
+
+
+        if self.encoder is None:
+            self.encoder = default_encoder(self.dim_input, self.n_components)  
+        else: 
+            self.encoder
         
         if self.decoder is None or isinstance(self.decoder, nn.Module):
-            decoder = self.decoder
+            self.decoder = self.decoder
         elif self.decoder == True:
-            decoder = default_decoder(X.shape[1:], self.n_components)
+            self.decoder = default_decoder(self.dim_input, self.n_components)
             
-            
+
         if not self.match_nonparametric_umap:
-            self.model = Model(self.lr, encoder, decoder, beta=self.beta, min_dist=self.min_dist, reconstruction_loss=self.reconstruction_loss)
-            graph = get_umap_graph(X, n_neighbors=self.n_neighbors, metric=self.metric, random_state=self.random_state)
+            self.model = Model(
+                lr = self.lr, 
+                encoder = self.encoder, 
+                decoder = self.decoder, 
+                beta = self.beta,
+                min_dist = self.min_dist, 
+                reconstruction_loss=self.reconstruction_loss
+                )
+            graph = get_umap_graph(
+                X = X, 
+                n_neighbors = self.n_neighbors, 
+                metric=self.metric, 
+                random_state=self.random_state
+                )
             trainer.fit(
                 model=self.model,
                 datamodule=Datamodule(UMAPDataset(X, graph), self.batch_size, self.num_workers)
                 )
+
         else:
             print("Fitting Non parametric Umap")
-            non_parametric_umap = UMAP(n_neighbors=self.n_neighbors, min_dist=self.min_dist, metric=self.metric, n_components=self.n_components, random_state=self.random_state, verbose=True)
+            non_parametric_umap = UMAP(
+                n_neighbors = self.n_neighbors, 
+                min_dist = self.min_dist, 
+                metric = self.metric, 
+                n_components = self.n_components, 
+                random_state = self.random_state, 
+                verbose = True
+                )
             non_parametric_embeddings = non_parametric_umap.fit_transform(torch.flatten(X, 1, -1).numpy())
-            self.model = Model(self.lr, encoder, decoder, beta=self.beta, reconstruction_loss=self.reconstruction_loss, match_nonparametric_umap=self.match_nonparametric_umap)
+            self.model = Model(
+                lr = self.lr, 
+                encoder = self.encoder, 
+                decoder = self.decoder, 
+                beta = self.beta, 
+                reconstruction_loss = self.reconstruction_loss, 
+                match_nonparametric_umap = self.match_nonparametric_umap
+                )
             print("Training NN to match embeddings")
             trainer.fit(
                 model=self.model,
-                datamodule=Datamodule(MatchDataset(X, non_parametric_embeddings), self.batch_size, self.num_workers)
+                datamodule=Datamodule(
+                    dataset = MatchDataset(X, non_parametric_embeddings), 
+                    batch_size = self.batch_size, 
+                    num_workers =   self.num_workers)
             )
         
     @torch.no_grad()
@@ -184,15 +231,12 @@ class PUMAP():
     @torch.no_grad()
     def inverse_transform(self, Z):
         return self.model.decoder(Z).detach().cpu().numpy()
-    
-    def save(self, path):
-        with open(path, 'wb') as oup:
-            dill.dump(self, oup)
-        print(f"Pickled PUMAP object at {path}")
+
+
         
-def load_pumap(path): 
-    print("Loading PUMAP object from pickled file.")
-    with open(path, 'rb') as inp: return dill.load(inp)
+def load_pumap(path):
+
+    return Model.load_from_checkpoint(path)
 
 if __name__== "__main__":
     pass

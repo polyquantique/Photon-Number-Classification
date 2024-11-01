@@ -218,37 +218,12 @@ def loss_function_L1(X_high : Tensor,
     return loss(X_high, X_reconst)
 
 
-def loss_function_position(X_low : Tensor,
-                           n_cluster : Tensor,
-                           size_gauss : float,
-                           dev):
-
-    X_low = X_low[:,0].view(-1,1)
-
-    if X_low.min() == X_low.max():
-        loss = 2
-    else:
-        X_low = (X_low - X_low.min()) / (X_low.max() - X_low.min())
-
-    means = torch.linspace(0,1,n_cluster).to(torch.device(dev))
-    std = 1 / (size_gauss*n_cluster)
-    #desired_dist = torch.logsumexp( (X_low - torch.linspace(0,1,n_cluster)) / (var2) , dim=1) #1/(np.pi*var2) * 
-    #X_test = torch.linspace(-2,2,10_000).view(-1,1)
-    desired_dist = torch.logsumexp(- 0.5 * ((X_low - means) / std) ** 2, dim=1) #
-    #desired_dist = torch.from_numpy(1 + signal.square(2 * np.pi * n_cluster * X_low.detach().numpy()))**2
-    loss = torch.mean(torch.abs(desired_dist))
-
-    return loss
-
-
 def loss_total(loss_KL,
             loss_L1,
-            loss_position,
-            alpha_pos : float = 1,
             alpha_l1 : float = 1,
             alpha_KL : float = 1):
 
-    return alpha_l1 * loss_L1 +  alpha_pos * loss_position + alpha_KL * loss_KL 
+    return alpha_l1 * loss_L1 + alpha_KL * loss_KL 
 
 
 def train_ptsne(# Data
@@ -323,7 +298,7 @@ def train_ptsne(# Data
     Returns
     -------
     Joint distribution matrix : tensor
-        Joint probability matrix. All values in it sum up to 1.    
+        Joint probability matrix. All values in it sum up to 1.
     """
 
     EPS = tensor([1e-10]).to(device(dev))
@@ -456,22 +431,14 @@ def train_ptsne(# Data
             loss_L1_ = loss_function_L1(X_high = orig_points_batch,
                                         X_reconst = X_reconst_batch.view(-1, input_dimens))
 
-            loss_pos_ = loss_function_position(X_low = X_low, 
-                                               n_cluster = n_cluster, 
-                                               size_gauss = size_gauss,
-                                               dev = dev)
-
             loss = loss_total(loss_KL = loss_KL_,
                             loss_L1 = loss_L1_,
-                            loss_position = loss_pos_,
-                            alpha_pos = alpha_pos,
                             alpha_l1 = alpha_l1,
                             alpha_KL = alpha_KL)
 
 
             train_loss_KL += loss_KL_.item()
             train_loss_L1 += loss_L1_.item()
-            train_loss_pos += loss_pos_.item()
             train_loss_tot += loss.item()
 
             # Make an optimization step
@@ -481,31 +448,11 @@ def train_ptsne(# Data
         # Report loss for epoch
         average_loss_KL = train_loss_KL / batches_passed
         average_loss_L1 = train_loss_L1 / batches_passed
-        average_loss_pos = train_loss_pos / batches_passed
         average_loss_tot = train_loss_tot / batches_passed
-        epoch_losses.append(np.array([average_loss_KL, average_loss_L1, average_loss_pos, average_loss_tot]))
-        #print(f'Epoch: {epoch + 1}. Time {time_elapsed}. Average loss: {average_loss_tot:.4f}', flush=True)
-
-    #save_path_model = os.path.join(save_dir_path, f"{save_dir_path}/models/{model_name}")
-    #save_path_config = os.path.join(save_dir_path, f"{save_dir_path}/config/{model_name}")
-    #save_path_loss = os.path.join(save_dir_path, f"{save_dir_path}/loss/{model_name}")
-
-    #{save_dir_path}/
-
-    # config = {
-    #         'dim_emb' : dim_emb,
-    #         'perplexity' : perplexity,
-    #         'n_epochs' : n_epochs,
-    #         'dev' : dev,
-    #         'early_exaggeration' : early_exaggeration,
-    #         'early_exaggeration_constant' : early_exaggeration_constant,
-    #         'learning_rate' : learning_rate,
-    #         'alpha_loss' : alpha_loss,
-    #         'batch_size' : batch_size
-    #         }
+        epoch_losses.append(np.array([average_loss_KL, average_loss_L1, average_loss_tot]))
 
     if not isdir(folder_path):
-        makedirs(folder_path, exist_ok=True)        
+        makedirs(folder_path, exist_ok=True)
 
     torch.save(model.state_dict(), model_path)
     np.save(loss_path, np.array(epoch_losses))
@@ -530,8 +477,7 @@ def plot_results(model,
         
         plt.plot(loss[:,0], linewidth=1, alpha=0.8, label='KL', linestyle='--')
         plt.plot(params['training']['alpha_l1'] * loss[:,1], linewidth=1, alpha=0.8, label='L1', linestyle='-.')
-        plt.plot(params['training']['alpha_pos'] * loss[:,2], linewidth=1, alpha=0.8, label='POS', linestyle=':')
-        plt.plot(loss[:,3], linewidth=1, alpha=0.8, label='Total', linestyle='-')
+        plt.plot(loss[:,2], linewidth=1, alpha=0.8, label='Total', linestyle='-')
 
         plt.xlabel('epochs')
         plt.ylabel('Loss')
@@ -549,7 +495,7 @@ def load_model(model, path_config : str = 'src/ParametricTSNE/model 1D'):
 
     params = json.load(open(f'{path_config}/config.json', 'r'))
     model = model(**params['network'])
-    model.load_state_dict(torch.load(f'{path_config}/model.pt'))
+    model.load_state_dict(torch.load(f'{path_config}/model.pt', weights_only=True, map_location=torch.device("cpu")))
     model.eval()
 
     return model
