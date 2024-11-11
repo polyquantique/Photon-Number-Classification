@@ -1,24 +1,25 @@
+[![a](https://img.shields.io/static/v1?label=arXiv&message=2411.05737 (&color=active&style=flat-square)](https://arxiv.org/abs/2411.05737 ()
 
-# PHOTON NUMBER CLASSIFICATION
+# Photon Number Classification
 
 Comparison of different algorithms for the classification of transition edge sensor signals.
 With the development of a variety of techniques in the field of machine learning the goal is to quantify the advantages of modern classification techniques in the context of photon detection. 
 
-## FILES
+## Files
 
-### CONFIDENCE
+### Confidence
 
 - `Methods_Uniform.ipynb`
 - `Methods_Geometric.ipynb`
 - `Methods_Large.ipynb`
 - `Methods_Noise.ipynb`
 
-### TRAINING
+### Training
 
 - `Train_PtSNE.ipynb`
 - `Train_PUMAP.ipynb`
 
-### FIGURES
+### Figures
 
 - `Effect_Gaussians.ipynb`
 - `Figures_General.ipynb`
@@ -26,7 +27,7 @@ With the development of a variety of techniques in the field of machine learning
 - `Find_Distributions.ipynb`
 
 
-## EXPERIMENTS
+## Experiments
 
 The different algorithms are compared in a single notebook available in :
 
@@ -50,7 +51,7 @@ The following methods are evaluated :
 
 - Include Sphinx documentation
 
-## ACKNOWLEDGMENTS
+## Acknowledgements
 
 N.D.-C. and N.Q. acknowledge support from the Ministère de l'Économie et de l'Innovation du Québec, the Natural Sciences and Engineering Research Council Canada, Photonique Quantique Québec, and thank S. Montes-Valencia, J. Martinez-Cifuentes and A. Boon for valuable discussions. We also thank Z. Levine and S. Glancy for their careful feedback on our manuscript.
 
