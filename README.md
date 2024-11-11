@@ -1,4 +1,4 @@
-[![a](https://img.shields.io/static/v1?label=arXiv&message=2411.05737 (&color=active&style=flat-square)](https://arxiv.org/abs/2411.05737 ()
+[![a](https://img.shields.io/static/v1?label=arXiv&message=2411.05737 (&color=active&style=flat-square)](https://arxiv.org/abs/2411.05737)
 
 # Photon Number Classification
 
