@@ -30,9 +30,7 @@ With the development of a variety of techniques in the field of machine learning
 
 ## Experiments
 
-The different algorithms are compared in a single notebook available in :
-
-`uniform_TES.ipynb`
+The different algorithms are compared in a single notebook available in : [`Methods_Uniform.ipynb`](Methods_Uniform.ipynb)
 
 The following methods are evaluated :
 
