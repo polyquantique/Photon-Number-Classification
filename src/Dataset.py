@@ -1,10 +1,9 @@
 import numpy as np
+from typing import Union
 import matplotlib.pyplot as plt
 from scipy.stats import poisson
-from os import listdir
-
-from .Utils import norm
-from .ExistingAlgorithms import area
+import zipfile
+import polars as pl
 
 Average = [7.08211260e+06, 5.15056588e+06, 3.72436481e+06, 2.71572185e+06,
             1.97472603e+06, 1.42408918e+06, 1.02232317e+06, 7.32125310e+05,
@@ -19,108 +18,105 @@ Average = [7.08211260e+06, 5.15056588e+06, 3.72436481e+06, 2.71572185e+06,
             9.02367143e+00, 6.40704597e+00, 4.54269070e+00, 3.20272751e+00,
             2.26309906e+00]
 
-dB = [ 7.,   7.5,  8.,   8.5,  9.,   9.5, 10.,  10.5, 11.,  11.5, 12.,  12.5, 13.,  13.5,
+dB = [ 7.0,   7.5,  8.0,   8.5,  9.0,   9.5, 10.,  10.5, 11.,  11.5, 12.,  12.5, 13.,  13.5,
        14.,  14.5, 15.,  15.5, 16.,  16.5, 17.,  17.5, 18.,  18.5, 19.,  19.5, 20.,  20.5,
        21.,  21.5, 22.,  22.5, 23.,  23.5, 24.,  24.5, 25.,  25.5, 26.,  26.5, 27.,  27.5,
        28.,  28.5, 29. ]
 
+def stand(X : np.array):
+    """
 
-def dataset_TES(weights,
-                path_test = r'/home/nicolasdc/Documents/publish/src/Datasets/TES/NIST test/',
-                path_train = r'/home/nicolasdc/Documents/publish/src/Datasets/TES/NIST train/',
-                path_random_index = r'/home/nicolasdc/Documents/publish/src/Results TES (Uniform)/randomIndexUniform.npy',
-                signal_size = 8192,
-                interval = [0,270],
-                n_photon_number = 100,
-                order_dB = False,
-                normalize = False,
-                plot_traces = False,
-                plot_expected = False,
-                return_db = False):
+    Standardize an array
+
+    Parameters
+    ----------
+    X : ndarray
+
+    Returns
+    -------
+    norm : ndarray
+    
+    """
+    return (X - X.mean()) / X.std()
+
+def dataset_dat(weights,
+                path_data : str,
+                path_random_index : str,
+                signal_size : int = 8192,
+                interval : list = [0,270],
+                n_photon_number : int = 100,
+                standardize : bool = False,
+                plot_traces : bool= False,
+                plot_expected : bool = False):
 
     init_size = len(weights)
     weights = np.array([0]*(len(Average) - init_size) + weights)
     weights = weights / weights.max()
     dB_ = [str(i) for i in dB]
-    files_test = listdir(path_test)
-    files_train = listdir(path_train)
-    
-    file_weight_test = [int(weights[dB_.index(i[67:71])] * 1_024) for i in files_test]
-    file_weight_train = [int(weights[dB_.index(i[67:71])] * 1_024) for i in files_train]
-    
+
+    archive = zipfile.ZipFile(path_data, 'r')
+    files = sorted(archive.namelist())
+
     X_test = []
     X_train = []
     X_dB_test = []
     X_dB_train = []
 
-    for w, fileName in zip(file_weight_test, files_test):
-        X_test_ = np.fromfile(f"{path_test}{fileName}",dtype=np.float16).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
-        X_test.append(X_test_)
-        X_dB_test.append(np.full(X_test_.shape[0], fileName[67:71]))
+    for file_ in files:
 
-    for w, fileName in zip(file_weight_train, files_train):
-        X_train_ = np.fromfile(f"{path_train}{fileName}",dtype=np.float16).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
-        X_train.append(X_train_)
-        X_dB_train.append(np.full(X_train_.shape[0], fileName[67:71]))
-    
-    X_test = -1*np.concatenate(X_test).astype("float")
-    X_train = -1*np.concatenate(X_train).astype("float")
+        if len(file_) > 100:
+        
+            w = int(weights[dB_.index(file_[84:88].replace(" ", ""))] * 1_024)
+
+            if w > 1:
+
+                if float(file_[111:113]) < 11: # Train 
+
+                    X_train.append(
+                        np.frombuffer(
+                            archive.read(file_), dtype=np.float16
+                            ).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
+                        )
+                    X_dB_train.append(
+                        np.full(w, file_[84:88])
+                        )
+                else: # Test
+                    X_test.append(
+                        np.frombuffer(
+                            archive.read(file_), dtype=np.float16
+                            ).reshape(-1,signal_size)[:w,interval[0]:interval[1]]
+                        )
+                    X_dB_test.append(
+                        np.full(w, file_[84:88])
+                        )
+            else:
+                pass
+        else:
+            pass
+        
+    X_test = -1 * np.concatenate(X_test).astype("float")
+    X_train = -1 * np.concatenate(X_train).astype("float")
     X_dB_test = np.concatenate(X_dB_test)
     X_dB_train = np.concatenate(X_dB_train)
 
-    if order_dB:
-        
-        min_ = X_test.min()
-        max_ = X_test.max()
-        data_test = []
-        data_train = []
 
-        for dB_it in dB_[-init_size:]:
+    if standardize:     
+        data_train = stand(X_train)
+        data_test = stand(X_test)
+    else:   
+        data_train = X_train
+        data_test = X_test
 
-            x = files_test[0][67:71]
-            file_weight_test = [i for i in files_test if i[67:71] == dB_it]
-            file_weight_train = [i for i in files_train if i[67:71] == dB_it]
+    if path_random_index != None:
+        # Shuffle based on reference index for reproducable results on different hardware
+        random_index = np.load(path_random_index)
+        data_train = data_train[random_index]
+        data_test = data_test[random_index]
+        X_dB_train = X_dB_train[random_index]
+        X_dB_test = X_dB_test[random_index]
 
-            test = -1 * np.concatenate([np.fromfile(f"{path_test}{fileName}",dtype=np.float16) \
-                                        .reshape(-1,signal_size)[:,interval[0]:interval[1]] \
-                                            for fileName in file_weight_test]).astype("float")
-            train = -1 * np.concatenate([np.fromfile(f"{path_train}{fileName}",dtype=np.float16) \
-                                        .reshape(-1,signal_size)[:,interval[0]:interval[1]] \
-                                            for fileName in file_weight_train]).astype("float")
-            
-            if normalize:
-                test= (test - min_) / (max_ - min_)
-                train = (train - min_) / (max_ - min_)
-
-            data_test.append(test)
-            data_train.append(train)
-        
-    else:
-
-        if normalize:     
-            data_train = norm(X_train)
-            data_test = norm(X_test)
-        else:   
-            data_train = X_train
-            data_test = X_test
-        
-        #np.random.seed(42)
-        #np.random.shuffle(data_train)
-        #np.random.shuffle(data_test)
-
-        if path_random_index != None:
-            # Shuffle based on reference index for reproducable results on different hardware
-            random_index = np.load(path_random_index)
-            data_train = data_train[random_index]
-            data_test = data_test[random_index]
-            X_dB_train = X_dB_train[random_index]
-            X_dB_test = X_dB_test[random_index]
-        else:
-            pass
-
-    
     expected_prob = np.zeros(n_photon_number)
-    n_arr = np.arange(0,n_photon_number)
+    n_arr = np.arange(n_photon_number)
 
     for average_, amplitude_ in zip(Average, weights):
         expected_prob += amplitude_ * poisson(mu = average_).pmf(n_arr)
@@ -134,7 +130,6 @@ def dataset_TES(weights,
             plt.bar(x = n_arr, 
                     height = expected_prob,
                     alpha = 0.5, 
-                    #edgecolor = 'k', 
                     zorder=2)
             plt.ylabel('Counts')
             plt.xlabel('Photon number')
@@ -143,79 +138,63 @@ def dataset_TES(weights,
     if plot_traces:
         with plt.style.context("seaborn-v0_8"):
             plt.figure(figsize=(10,4), dpi=100)
-            plt.plot(data_train.T[:,::10],
+            plt.plot(data_train[::10].T,
                      alpha = 0.05,
                      linewidth = 1)
-            plt.plot(data_test.T[:,::10],
+            plt.plot(data_test[::10].T,
                      alpha = 0.05,
                      linewidth = 1)
             plt.xlabel('Time (a.u.)')
             plt.ylabel('Voltage (a.u.)')
             plt.show()
 
-    if return_db:
-        return data_train, data_test, expected_prob, X_dB_train, X_dB_test
+    return data_train, data_test, expected_prob, X_dB_train, X_dB_test
+
+
+def dataset_csv(path_data : str, 
+                files : Union[list,None] = None,
+                plot_traces : bool = False):
+
+    archive = zipfile.ZipFile(path_data, 'r')
+
+    if files is None:
+        files = archive.namelist()
     else:
-        return data_train, data_test, expected_prob
+        pass
 
-
-
-
-
-
-
-
-
-
-
-def dataset_SNSPD(selected_dB,
-                path_test = r'/home/nicolasdc/files/Photon-Number-Classification/src/Datasets/SNSPD/Paderborn/data test/',
-                path_train = r'/home/nicolasdc/files/Photon-Number-Classification/src/Datasets/SNSPD/Paderborn/data train/',
-                path_dB = r'/home/nicolasdc/files/Photon-Number-Classification/src/Datasets/SNSPD/Paderborn/db_shuffled.npy',
-                signal_size = 30_000,
-                interval = [3250,4250],
-                skip = 1,
-                normalize = False):
+    files = sorted(files)
     
+    data = []
+    for file_ in files:
 
-    X_test = [] 
-    X_train = [] 
-    number_file_test = len(listdir(path_test))
-    number_file_train = len(listdir(path_train))
+        if len(file_) > 15:
+            data_ =  pl.read_csv(
+                archive.read(file_), 
+                has_header = False, 
+                separator = ","
+                ).to_numpy()
+            
+            data.append((data_[:,::3] - data_[:,:10].mean()))
 
-    dB = np.load(path_dB)
-    print(dB)
+        else:
+            pass
 
-    for file_number in range(number_file_test):
-    
-        if dB[file_number] in selected_dB:
-            data_temp = np.load(f"{path_test}/TracesNr{file_number}.npy").reshape(-1, signal_size)
-            data_temp = data_temp[:, interval[0]:interval[1]]
-            data_temp = data_temp[::skip]
-            X_test.append(data_temp)
+    data = np.concatenate(data, axis=0)
+    data_train = data[::2]
+    data_test = data[1::2]
 
-    X_test = -1 * np.concatenate(X_test)
-
-    for file_number in range(number_file_test, number_file_train):
-    
-        if dB[file_number] in selected_dB:
-            data_temp = np.load(f"{path_train}/TracesNr{file_number}.npy").reshape(-1, signal_size)
-            data_temp = data_temp[:, interval[0]:interval[1]]
-            data_temp = data_temp[::skip]
-            X_train.append(data_temp)
-
-    X_train = -1 * np.concatenate(X_train)
-
-    if normalize:     
-        data_train = norm(X_train)
-        data_test = norm(X_test)
-    else:   
-        data_train = X_train
-        data_test = X_test
-
-    
-    np.random.seed(42)
-    np.random.shuffle(data_train)
-    np.random.shuffle(data_test)
+    if plot_traces:
+        with plt.style.context("seaborn-v0_8"):
+            plt.figure(figsize=(10,4), dpi=100)
+            plt.plot(data_train[::10].T,
+                     alpha = 0.05,
+                     linewidth = 1)
+            plt.plot(data_test[::10].T,
+                     alpha = 0.05,
+                     linewidth = 1)
+            plt.xlabel('Time (a.u.)')
+            plt.ylabel('Voltage (a.u.)')
+            plt.show()
 
     return data_train, data_test
+
