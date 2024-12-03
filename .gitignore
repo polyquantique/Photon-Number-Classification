@@ -1,4 +1,5 @@
-
+Lightning/*
+src/Models/*
 src/Dataset/Data_Boulder/*
 src/Dataset/Data_Ottawa/*
 # Byte-compiled / optimized / DLL files
