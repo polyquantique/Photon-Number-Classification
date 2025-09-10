@@ -13,6 +13,7 @@ from scipy.stats import multivariate_normal, poisson, uniform, gennorm
 from scipy.special import gamma
 from scipy.signal import butter, filtfilt
 from scipy.integrate import simpson, trapezoid
+from joblib import Parallel, delayed
 
 class gaussian_mixture():
     """
@@ -75,7 +76,7 @@ class gaussian_mixture():
                  X_high : np.array,
                  number_cluster : int = 10,
                  label_shift : int = 0,
-                 critical_frequency : float = 0.01,
+                 critical_frequency : float = 0.05,
                  cluster_iter : int = 10,
                  means_init : Union[None,np.array] = None,
                  tol : float = 1e-3,
@@ -93,7 +94,7 @@ class gaussian_mixture():
         self.style_name = style#"seaborn-v0_8"  # str
         self.cmap = 'Blues'  # str
         self.text_color = 'k'  # str
-        self.levels = 30  # int
+        self.levels = 20  # int
         self.width_plot = width_plot  # Union[int, float]
         self.height_plot = height_plot  # Union[int, float]
         self.gridsize_density = 500  # int
@@ -280,11 +281,12 @@ class gaussian_mixture():
         # Get area and labels and applies filter on traces
         b, a = butter(5, self.critical_frequency, 'low')
         X_high_filter = filtfilt(b, a, self.X_high)
+        X_high_filter = np.where(X_high_filter < 0, 0, X_high_filter)
         X_Area = simpson(X_high_filter, axis=1).flatten()
         # Get average area of the clusters
         labels = np.arange(self.number_cluster)
         # Order labels based on photon number
-        index_sorted = np.argsort(np.array([np.mean(X_Area[predict_init == label_]) for label_ in labels]))
+        index_sorted = np.argsort(np.bincount(predict_init, weights=X_Area) / np.bincount(predict_init))
         # Update Gaussian Mixture parameters
         fit_.means_ = fit_.means_[index_sorted]
         fit_.covariances_ = fit_.covariances_[index_sorted]
@@ -577,11 +579,9 @@ class gaussian_mixture():
 
         return multi_gen_gauss
 
-    def multi_gaussian_2d(self, x : np.array, 
-                                y : np.array) -> np.array:
+    def multi_gaussian_2d(self, x: np.array, y: np.array) -> np.array:
         """
-
-        Create a numpy array of shape (`number_cluster` , `x.size`, `y.size`) containing a discrete 2D Gaussian for every cluster, 
+        Create a numpy array of shape (`number_cluster`, `x.size`, `y.size`) containing a discrete 2D Gaussian for every cluster,
         considering the Gaussian mixture parameters.
 
         Parameters
@@ -594,17 +594,19 @@ class gaussian_mixture():
         Returns
         -------
         multi_gaussian : ndarray
-            Array of shape (`number_cluster` , `x.size`, `y.size`) containing a discret 2D Gaussian for every cluster
-
+            Array of shape (`number_cluster`, `x.size`, `y.size`) containing a discrete 2D Gaussian for every cluster.
         """
-        multi_gaussian = np.zeros((self.number_cluster, x.size, y.size))
-        x, y = np.meshgrid(x, y)
-        pos = np.dstack((x, y))
+        # Create a meshgrid for the 2D space
+        X, Y = np.meshgrid(x, y)
+        pos = np.dstack((X, Y))  # Combine X and Y into a grid of points
 
-        for index, (mean, covariance) in enumerate(zip(self.cluster_means, self.cluster_covariances)):
-            multi_gaussian[index,:,:] = multivariate_normal(mean = mean, cov = covariance).pdf(pos)
+        # Compute the Gaussian for each cluster in parallel
+        multi_gaussian = Parallel(n_jobs=-1)(
+            delayed(multivariate_normal(mean=mean, cov=covariance).pdf)(pos)
+            for mean, covariance in zip(self.cluster_means, self.cluster_covariances)
+        )
 
-        return multi_gaussian
+        return np.array(multi_gaussian)
 
     def trapezoid_2d(self, x : np.array, 
                            y : np.array, 
